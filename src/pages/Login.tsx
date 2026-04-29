@@ -10,7 +10,7 @@ import { toast } from "sonner";
 const Login = () => {
   const navigate = useNavigate();
   const [email, setEmail] = useState("jordan@acme.io");
-  const [password, setPassword] = useState("demo1234");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
