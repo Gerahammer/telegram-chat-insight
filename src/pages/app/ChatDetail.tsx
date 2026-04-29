@@ -113,10 +113,27 @@ const ChatDetail = () => {
             <div className="h-12 w-12 rounded-lg gradient-primary flex items-center justify-center shadow-glow"><Hash className="h-6 w-6 text-primary-foreground" /></div>
             <div>
               <h1 className="text-2xl md:text-3xl font-bold tracking-tight">{chat.name}</h1>
-              <div className="flex items-center gap-3 mt-1 text-sm text-muted-foreground">
+              <div className="flex flex-wrap items-center gap-3 mt-1 text-sm text-muted-foreground">
                 {chat.type && <Badge variant="secondary" className="capitalize">{chat.type}</Badge>}
-                <span className="flex items-center gap-1"><Users className="h-3 w-3" />{chat.members ?? 0} members</span>
-                <span className="flex items-center gap-1"><MessageSquare className="h-3 w-3" />{chat.messagesToday ?? 0} today</span>
+                {chat.lastActivity && (
+                  <span className="flex items-center gap-1">
+                    Last activity: <TimeAgo iso={chat.lastActivity} />
+                  </span>
+                )}
+                <span className="flex items-center gap-1">
+                  <MessageSquare className="h-3 w-3" />
+                  {chat.messagesToday ?? 0} messages today
+                </span>
+                <Badge
+                  variant="outline"
+                  className={
+                    chat.isActive
+                      ? "bg-success/10 text-success border-success/20"
+                      : "bg-muted text-muted-foreground border-border"
+                  }
+                >
+                  {chat.isActive ? "Active" : "Inactive"}
+                </Badge>
               </div>
             </div>
           </div>
