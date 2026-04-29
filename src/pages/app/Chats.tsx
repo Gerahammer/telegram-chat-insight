@@ -111,7 +111,10 @@ const Chats = () => {
         <Card className="py-16 text-center text-muted-foreground">
           <Inbox className="h-10 w-10 mx-auto mb-3 opacity-40" />
           <p className="text-sm">No chats connected yet.</p>
-          <p className="text-xs mt-1">Add @Sumerz_bot to a Telegram group and run /connect [token].</p>
+          <p className="text-xs mt-1 mb-4">Add @Sumerz_bot to a Telegram group to get started.</p>
+          <Button onClick={() => setConnectOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" /> Connect new chat
+          </Button>
         </Card>
       ) : list.length === 0 ? (
         <Card className="py-12 text-center text-muted-foreground text-sm">No chats match your search.</Card>
