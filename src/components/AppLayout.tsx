@@ -121,6 +121,7 @@ export default function AppLayout() {
           </main>
         </div>
       </div>
+     </WorkspaceStatsProvider>
     </SidebarProvider>
   );
 }
