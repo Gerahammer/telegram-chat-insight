@@ -6,9 +6,10 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { TimeAgo } from "@/components/Badges";
-import { Search, Hash, Inbox, RefreshCw, CheckCircle2, Clock, MessageSquare } from "lucide-react";
+import { Search, Hash, Inbox, RefreshCw, CheckCircle2, Clock, MessageSquare, Plus } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { toast } from "sonner";
+import { ConnectChatDialog } from "@/components/ConnectChatDialog";
 
 interface ApiChat {
   id: string;
