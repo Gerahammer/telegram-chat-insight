@@ -15,14 +15,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Logo } from "./Logo";
 import { Badge } from "./ui/badge";
-
-const items = [
-  { title: "Dashboard", url: "/app", icon: LayoutDashboard, end: true },
-  { title: "Chats", url: "/app/chats", icon: MessagesSquare, badge: "7" },
-  { title: "Action Items", url: "/app/actions", icon: ListTodo, badge: "5" },
-  { title: "No Activity", url: "/app/no-activity", icon: MoonStar },
-  { title: "Summaries", url: "/app/summaries", icon: FileText },
-];
+import { useWorkspaceStats } from "@/lib/workspace-stats";
 
 const bottomItems = [
   { title: "Settings", url: "/app/settings", icon: Settings },
@@ -33,9 +26,33 @@ export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const { pathname } = useLocation();
+  const { chatsCount, openActionsCount, noActivityCount, loading } = useWorkspaceStats();
 
   const isActive = (url: string, end?: boolean) =>
     end ? pathname === url : pathname === url || pathname.startsWith(url + "/");
+
+  const items: { title: string; url: string; icon: typeof LayoutDashboard; end?: boolean; badge?: string }[] = [
+    { title: "Dashboard", url: "/app", icon: LayoutDashboard, end: true },
+    {
+      title: "Chats",
+      url: "/app/chats",
+      icon: MessagesSquare,
+      badge: loading ? undefined : String(chatsCount ?? 0),
+    },
+    {
+      title: "Action Items",
+      url: "/app/actions",
+      icon: ListTodo,
+      badge: loading ? undefined : String(openActionsCount ?? 0),
+    },
+    {
+      title: "No Activity",
+      url: "/app/no-activity",
+      icon: MoonStar,
+      badge: loading ? undefined : String(noActivityCount ?? 0),
+    },
+    { title: "Summaries", url: "/app/summaries", icon: FileText },
+  ];
 
   return (
     <Sidebar collapsible="icon" className="border-r border-sidebar-border">
@@ -58,7 +75,7 @@ export function AppSidebar() {
                       {!collapsed && (
                         <>
                           <span className="flex-1">{item.title}</span>
-                          {item.badge && (
+                          {item.badge !== undefined && item.badge !== "0" && (
                             <Badge variant="secondary" className="bg-sidebar-accent text-sidebar-accent-foreground text-xs">
                               {item.badge}
                             </Badge>

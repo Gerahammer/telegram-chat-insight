@@ -14,6 +14,7 @@ import {
 } from "./ui/dropdown-menu";
 import { Bell, LogOut, User, Building2 } from "lucide-react";
 import { apiFetch, clearAuthToken } from "@/lib/api";
+import { WorkspaceStatsProvider } from "@/lib/workspace-stats";
 
 interface MeResponse {
   name?: string;
