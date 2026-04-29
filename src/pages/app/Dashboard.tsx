@@ -6,188 +6,123 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { StatCard } from "@/components/StatCard";
 import { AttentionBadge } from "@/components/Badges";
 import {
-  MessagesSquare,
-  AlertTriangle,
-  MoonStar,
-  ListTodo,
-  MessageSquare,
-  Smile,
-  ArrowRight,
-  Inbox,
+  MessagesSquare, AlertTriangle, MoonStar, ListTodo,
+  MessageSquare, Smile, ArrowRight, Inbox,
 } from "lucide-react";
 import {
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  CartesianGrid,
-  PieChart,
-  Pie,
-  Cell,
-  Legend,
+  ResponsiveContainer, BarChart, Bar, XAxis, YAxis,
+  Tooltip, CartesianGrid, PieChart, Pie, Cell, Legend,
 } from "recharts";
 import { apiFetch } from "@/lib/api";
 import type { AttentionStatus } from "@/lib/mock-data";
 
 interface OverviewStats {
   totalConnectedChats?: number;
-  connectedChats?: number;
   chatsNeedingAttention?: number;
-  needAttention?: number;
   chatsWithNoActivity?: number;
-  noActivity?: number;
   openActionItems?: number;
-  openActions?: number;
   totalMessagesToday?: number;
-  messagesToday?: number;
   averageSentiment?: number | string;
-  avgSentiment?: number | string;
-  messageVolume?: { day: string; messages: number }[];
-  activityBreakdown?: { name: string; value: number; color?: string }[];
+  chartData?: { date: string; count: number }[];
+  recentSummaries?: RecentSummary[];
+}
+
+interface RecentSummary {
+  id: string;
+  chatId: string;
+  chatTitle?: string;
+  summaryText?: string;
+  requiresAttention?: boolean;
+  priority?: string;
+  sentiment?: string;
+  noActivity?: boolean;
+  date?: string;
 }
 
 interface MeResponse {
-  name?: string;
-  fullName?: string;
-  firstName?: string;
-  email?: string;
-  workspace?: { name?: string };
-  workspaceName?: string;
+  user?: { name?: string; email?: string };
+  company?: { name?: string };
 }
 
-interface ChatItem {
+interface ApiChat {
   id: string;
-  name: string;
-  attention?: AttentionStatus | string;
-  unanswered?: number;
-  messagesToday?: number;
+  title?: string;
+  requiresAttention?: boolean;
+  isActive?: boolean;
+  messageCount?: number;
 }
 
-interface SummaryItem {
-  id: string;
-  chat?: string;
-  chatName?: string;
-  summary?: string;
-  text?: string;
-  time?: string;
-  createdAt?: string;
-  attention?: AttentionStatus | string;
-}
-
-const ATTENTION_COLOR: Record<string, string> = {
-  Active: "hsl(var(--success))",
-  active: "hsl(var(--success))",
-  ok: "hsl(var(--success))",
-  "Needs attention": "hsl(var(--warning))",
-  needs_attention: "hsl(var(--warning))",
-  Urgent: "hsl(var(--destructive))",
-  urgent: "hsl(var(--destructive))",
-  "No activity": "hsl(var(--muted-foreground))",
-  no_activity: "hsl(var(--muted-foreground))",
-};
-
-async function safeJson<T>(res: Response): Promise<T | null> {
-  if (!res.ok) return null;
-  try {
-    return (await res.json()) as T;
-  } catch {
-    return null;
-  }
+async function safeJson<T>(res: Response | null): Promise<T | null> {
+  if (!res || !res.ok) return null;
+  try { return (await res.json()) as T; } catch { return null; }
 }
 
 const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [me, setMe] = useState<MeResponse | null>(null);
   const [stats, setStats] = useState<OverviewStats | null>(null);
-  const [chats, setChats] = useState<ChatItem[]>([]);
-  const [summaries, setSummaries] = useState<SummaryItem[]>([]);
-  const [openActionsCount, setOpenActionsCount] = useState<number | null>(null);
+  const [chats, setChats] = useState<ApiChat[]>([]);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       setLoading(true);
-      const [overviewRes, meRes, chatsRes, summariesRes, actionsRes] = await Promise.all([
+      const [overviewRes, meRes, chatsRes] = await Promise.all([
         apiFetch("/api/dashboard/overview").catch(() => null),
         apiFetch("/api/auth/me").catch(() => null),
         apiFetch("/api/chats").catch(() => null),
-        apiFetch("/api/summaries/daily").catch(() => null),
-        apiFetch("/api/action-items?status=OPEN").catch(() => null),
       ]);
-
       if (cancelled) return;
 
-      const overview = overviewRes ? await safeJson<OverviewStats>(overviewRes) : null;
-      const meData = meRes ? await safeJson<MeResponse>(meRes) : null;
-      const chatsData = chatsRes ? await safeJson<ChatItem[] | { items?: ChatItem[] }>(chatsRes) : null;
-      const summariesData = summariesRes
-        ? await safeJson<SummaryItem[] | { items?: SummaryItem[] }>(summariesRes)
-        : null;
-      const actionsData = actionsRes
-        ? await safeJson<unknown[] | { items?: unknown[]; total?: number; count?: number }>(actionsRes)
-        : null;
+      const overview = await safeJson<OverviewStats>(overviewRes);
+      const meData = await safeJson<MeResponse>(meRes);
+      const chatsData = await safeJson<{ chats?: ApiChat[] } | ApiChat[]>(chatsRes);
 
       setStats(overview);
       setMe(meData);
-      setChats(Array.isArray(chatsData) ? chatsData : chatsData?.items ?? []);
-      setSummaries(Array.isArray(summariesData) ? summariesData : summariesData?.items ?? []);
-
-      if (Array.isArray(actionsData)) setOpenActionsCount(actionsData.length);
-      else if (actionsData && typeof actionsData === "object") {
-        const o = actionsData as { items?: unknown[]; total?: number; count?: number };
-        setOpenActionsCount(o.total ?? o.count ?? o.items?.length ?? 0);
-      } else {
-        setOpenActionsCount(0);
-      }
-
+      const chatList = Array.isArray(chatsData) ? chatsData : (chatsData as any)?.chats ?? [];
+      setChats(chatList);
       setLoading(false);
     })();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, []);
 
   const userName =
-    me?.firstName ||
-    me?.name?.split(" ")[0] ||
-    me?.fullName?.split(" ")[0] ||
-    me?.email?.split("@")[0] ||
+    me?.user?.name?.split(" ")[0] ||
+    me?.user?.email?.split("@")[0] ||
     "there";
 
-  const totalChats = stats?.totalConnectedChats ?? stats?.connectedChats ?? chats.length ?? 0;
-  const needAttention =
-    stats?.chatsNeedingAttention ??
-    stats?.needAttention ??
-    chats.filter((c) => c.attention === "needs_attention" || c.attention === "urgent").length;
-  const noActivity =
-    stats?.chatsWithNoActivity ??
-    stats?.noActivity ??
-    chats.filter((c) => c.attention === "no_activity").length;
-  const openActions = stats?.openActionItems ?? stats?.openActions ?? openActionsCount ?? 0;
-  const messagesToday =
-    stats?.totalMessagesToday ??
-    stats?.messagesToday ??
-    chats.reduce((s, c) => s + (c.messagesToday ?? 0), 0);
-  const avgSentiment = stats?.averageSentiment ?? stats?.avgSentiment ?? 0;
+  const totalChats = stats?.totalConnectedChats ?? chats.length;
+  const needAttention = stats?.chatsNeedingAttention ?? 0;
+  const noActivity = stats?.chatsWithNoActivity ?? 0;
+  const openActions = stats?.openActionItems ?? 0;
+  const messagesToday = stats?.totalMessagesToday ?? 0;
+  const avgSentiment = stats?.averageSentiment ?? "neutral";
 
-  const messageVolume = stats?.messageVolume ?? [];
-  const activityBreakdown =
-    stats?.activityBreakdown?.map((e) => ({
-      ...e,
-      color: e.color ?? ATTENTION_COLOR[e.name] ?? "hsl(var(--muted-foreground))",
-    })) ?? [];
+  const messageVolume = (stats?.chartData ?? []).map(d => ({
+    day: d.date?.slice(5),
+    messages: d.count,
+  }));
 
-  const attentionChats = chats.filter(
-    (c) => c.attention === "urgent" || c.attention === "needs_attention",
-  );
+  const activeCount = chats.filter(c => c.isActive && !c.requiresAttention).length;
+  const attentionCount = chats.filter(c => c.requiresAttention).length;
+  const activityBreakdown = chats.length > 0 ? [
+    { name: "Active", value: activeCount, color: "hsl(142 76% 36%)" },
+    { name: "Needs attention", value: attentionCount, color: "hsl(38 92% 50%)" },
+    { name: "No activity", value: noActivity, color: "hsl(215 20% 65%)" },
+  ].filter(e => e.value > 0) : [];
+
+  const recentSummaries = stats?.recentSummaries ?? [];
+  const attentionChats = chats.filter(c => c.requiresAttention);
+
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
 
   return (
     <div className="space-y-6 max-w-[1400px] mx-auto">
       <div>
         <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
-          {loading ? "Loading…" : `Good morning, ${userName} 👋`}
+          {loading ? "Loading…" : `${greeting}, ${userName} 👋`}
         </h1>
         <p className="text-muted-foreground mt-1">
           Here's what's happening across your Telegram chats today.
@@ -202,7 +137,7 @@ const Dashboard = () => {
         <StatCard label="Messages today" value={loading ? "–" : messagesToday} icon={MessageSquare} />
         <StatCard
           label="Avg sentiment"
-          value={loading ? "–" : typeof avgSentiment === "number" ? avgSentiment.toFixed(2) : avgSentiment}
+          value={loading ? "–" : typeof avgSentiment === "number" ? avgSentiment.toFixed(2) : String(avgSentiment)}
           icon={Smile}
           variant="success"
         />
@@ -227,17 +162,11 @@ const Dashboard = () => {
             ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={messageVolume}>
-                  <defs>
-                    <linearGradient id="bar" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="hsl(var(--primary))" />
-                      <stop offset="100%" stopColor="hsl(var(--primary-glow))" />
-                    </linearGradient>
-                  </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
                   <XAxis dataKey="day" stroke="hsl(var(--muted-foreground))" fontSize={12} />
                   <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
                   <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8 }} />
-                  <Bar dataKey="messages" fill="url(#bar)" radius={[8, 8, 0, 0]} />
+                  <Bar dataKey="messages" fill="hsl(var(--primary))" radius={[8, 8, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             )}
@@ -259,9 +188,7 @@ const Dashboard = () => {
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie data={activityBreakdown} dataKey="value" nameKey="name" innerRadius={50} outerRadius={80} paddingAngle={2}>
-                    {activityBreakdown.map((e, i) => (
-                      <Cell key={i} fill={e.color} />
-                    ))}
+                    {activityBreakdown.map((e, i) => <Cell key={i} fill={e.color} />)}
                   </Pie>
                   <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
                   <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8 }} />
@@ -285,10 +212,7 @@ const Dashboard = () => {
           </div>
           <div className="space-y-2">
             {loading ? (
-              <>
-                <Skeleton className="h-14 w-full" />
-                <Skeleton className="h-14 w-full" />
-              </>
+              <><Skeleton className="h-14 w-full" /><Skeleton className="h-14 w-full" /></>
             ) : attentionChats.length === 0 ? (
               <div className="py-8 text-center text-muted-foreground">
                 <Inbox className="h-8 w-8 mx-auto mb-2 opacity-40" />
@@ -296,18 +220,13 @@ const Dashboard = () => {
               </div>
             ) : (
               attentionChats.map((c) => (
-                <Link
-                  key={c.id}
-                  to={`/app/chats/${c.id}`}
-                  className="flex items-center justify-between p-3 rounded-lg border border-border hover:border-primary/40 hover:bg-secondary/50 transition"
-                >
+                <Link key={c.id} to={`/app/chats/${c.id}`}
+                  className="flex items-center justify-between p-3 rounded-lg border border-border hover:border-primary/40 hover:bg-secondary/50 transition">
                   <div>
-                    <div className="font-medium">{c.name}</div>
-                    <div className="text-xs text-muted-foreground mt-0.5">
-                      {(c.unanswered ?? 0)} unanswered · {(c.messagesToday ?? 0)} messages today
-                    </div>
+                    <div className="font-medium">{c.title ?? "Untitled chat"}</div>
+                    <div className="text-xs text-muted-foreground mt-0.5">{c.messageCount ?? 0} messages today</div>
                   </div>
-                  <AttentionBadge status={(c.attention as AttentionStatus) ?? "ok"} />
+                  <AttentionBadge status={"needs_attention" as AttentionStatus} />
                 </Link>
               ))
             )}
@@ -326,31 +245,22 @@ const Dashboard = () => {
           </div>
           <div className="space-y-3">
             {loading ? (
-              <>
-                <Skeleton className="h-16 w-full" />
-                <Skeleton className="h-16 w-full" />
-              </>
-            ) : summaries.length === 0 ? (
+              <><Skeleton className="h-16 w-full" /><Skeleton className="h-16 w-full" /></>
+            ) : recentSummaries.length === 0 ? (
               <div className="py-8 text-center text-muted-foreground">
                 <Inbox className="h-8 w-8 mx-auto mb-2 opacity-40" />
                 <p className="text-sm">No summaries yet</p>
               </div>
             ) : (
-              summaries.slice(0, 4).map((s) => (
-                <div key={s.id} className="p-3 rounded-lg border border-border">
+              recentSummaries.slice(0, 4).map((s) => (
+                <Link key={s.id} to={`/app/chats/${s.chatId}`}
+                  className="block p-3 rounded-lg border border-border hover:border-primary/40 transition">
                   <div className="flex items-center justify-between mb-1">
-                    <div className="font-medium text-sm">{s.chat ?? s.chatName ?? "Chat"}</div>
-                    <div className="flex items-center gap-2">
-                      {(s.time || s.createdAt) && (
-                        <span className="text-xs text-muted-foreground">{s.time ?? s.createdAt}</span>
-                      )}
-                      {s.attention && <AttentionBadge status={s.attention as AttentionStatus} />}
-                    </div>
+                    <div className="font-medium text-sm">{s.chatTitle ?? "Chat"}</div>
+                    <span className="text-xs text-muted-foreground">{s.date?.slice(0, 10)}</span>
                   </div>
-                  <p className="text-sm text-muted-foreground line-clamp-2">
-                    {s.summary ?? s.text ?? ""}
-                  </p>
-                </div>
+                  <p className="text-sm text-muted-foreground line-clamp-2">{s.summaryText ?? ""}</p>
+                </Link>
               ))
             )}
           </div>
