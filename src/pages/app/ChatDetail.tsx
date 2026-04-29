@@ -31,34 +31,54 @@ const ChatDetail = () => {
     let cancelled = false;
     (async () => {
       try {
-        const res = await apiFetch(`/api/chats/${encodeURIComponent(id)}`);
-        if (!res.ok) {
+        const [chatRes, msgRes] = await Promise.all([
+          apiFetch(`/api/chats/${encodeURIComponent(id)}`),
+          apiFetch(`/api/chats/${encodeURIComponent(id)}/messages`),
+        ]);
+        if (!chatRes.ok) {
           if (!cancelled) setNotFound(true);
           return;
         }
-        const json: any = await res.json();
+        const json: any = await chatRes.json();
         // Backend may return the chat object directly or wrapped under `chat`.
         const rawChat = json && typeof json === "object" && "chat" in json ? json.chat : json;
         const chat: Chat | undefined = rawChat
           ? {
               ...rawChat,
-              // Map backend `title` -> UI `name` while keeping any existing name fallback.
               name: rawChat.title ?? rawChat.name ?? "Untitled chat",
               type: rawChat.chatType ?? rawChat.type,
-              messagesToday: rawChat.messageCount ?? rawChat.messagesToday,
+              messagesToday: rawChat.messageCount ?? rawChat.messagesToday ?? 0,
               lastActivity: rawChat.lastActivityAt ?? rawChat.lastActivity,
               isActive: rawChat.isActive,
               todaySummary: rawChat.todaySummary,
             }
           : undefined;
-        const normalized: ChatDetailResponse =
+
+        let messages: Message[] = [];
+        if (msgRes.ok) {
+          try {
+            const mjson: any = await msgRes.json();
+            const rawMsgs: any[] = Array.isArray(mjson) ? mjson : (mjson?.items ?? mjson?.messages ?? []);
+            messages = rawMsgs.map((m: any) => ({
+              id: String(m.id ?? m._id ?? crypto.randomUUID()),
+              author: m.author ?? m.from ?? m.senderName ?? m.sender?.name ?? "Unknown",
+              text: m.text ?? m.content ?? m.message ?? "",
+              time: m.time ?? m.createdAt ?? m.timestamp ?? "",
+              flagged: m.flagged ?? m.needsReply ?? false,
+            }));
+          } catch {
+            messages = [];
+          }
+        }
+
+        const base: ChatDetailResponse =
           json && typeof json === "object" && "chat" in json
             ? { ...(json as ChatDetailResponse), chat }
             : {
                 chat,
                 summary: rawChat?.todaySummary ?? undefined,
               };
-        if (!cancelled) setData(normalized);
+        if (!cancelled) setData({ ...base, messages });
       } catch {
         if (!cancelled) setNotFound(true);
       } finally {
@@ -248,7 +268,12 @@ const ChatDetail = () => {
       <Card className="p-6">
         <h2 className="font-semibold flex items-center gap-2 mb-4"><Flag className="h-4 w-4" /> Recent messages</h2>
         <div className="space-y-3">
-          {messages.length === 0 && <p className="text-sm text-muted-foreground">Recent messages will appear here.</p>}
+          {messages.length === 0 && (
+            <div className="py-8 text-center text-muted-foreground">
+              <Inbox className="h-8 w-8 mx-auto mb-2 opacity-40" />
+              <p className="text-sm">No messages yet — send some messages in your Telegram group</p>
+            </div>
+          )}
           {messages.map((m) => (
             <div key={m.id} className="flex gap-3">
               <div className="h-8 w-8 rounded-full bg-secondary flex items-center justify-center text-xs font-semibold shrink-0">
