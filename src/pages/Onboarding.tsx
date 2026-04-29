@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,9 @@ import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { ArrowLeft, ArrowRight, Building2, Bot, MessagesSquare, Check, Copy, LayoutDashboard } from "lucide-react";
 import { toast } from "sonner";
+import { apiFetch } from "@/lib/api";
+
+const BOT_USERNAME = "@Sumerz_bot";
 
 const steps = [
   { title: "Create workspace", icon: Building2 },
@@ -18,7 +21,29 @@ const steps = [
 
 const Onboarding = () => {
   const [step, setStep] = useState(0);
+  const [connectionToken, setConnectionToken] = useState<string | null>(null);
+  const [tokenLoading, setTokenLoading] = useState(false);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    let cancelled = false;
+    setTokenLoading(true);
+    apiFetch("/api/workspaces/current/connection-token")
+      .then(async (res) => {
+        if (!res.ok) throw new Error(`Request failed: ${res.status}`);
+        const data = await res.json();
+        if (!cancelled) setConnectionToken(data.connectionToken ?? null);
+      })
+      .catch(() => {
+        if (!cancelled) setConnectionToken(null);
+      })
+      .finally(() => {
+        if (!cancelled) setTokenLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const next = () => (step < 3 ? setStep(step + 1) : navigate("/app"));
   const back = () => setStep(Math.max(0, step - 1));
@@ -82,16 +107,16 @@ const Onboarding = () => {
               </div>
               <Card className="p-6 bg-secondary border-dashed text-center space-y-3">
                 <Bot className="h-12 w-12 mx-auto text-primary" />
-                <div className="font-mono font-semibold text-lg">@ReplyRadarBot</div>
-                <Button variant="outline" size="sm" onClick={() => { navigator.clipboard.writeText("@ReplyRadarBot"); toast.success("Copied!"); }}>
+                <div className="font-mono font-semibold text-lg">{BOT_USERNAME}</div>
+                <Button variant="outline" size="sm" onClick={() => { navigator.clipboard.writeText(BOT_USERNAME); toast.success("Copied!"); }}>
                   <Copy className="h-3 w-3 mr-2" /> Copy
                 </Button>
               </Card>
               <ol className="space-y-3 text-sm">
                 {[
                   "Open Telegram on your phone or desktop",
-                  "Search for @ReplyRadarBot",
-                  "Press Start and authorize with the code below",
+                  `Search for ${BOT_USERNAME}`,
+                  "Send this command in your Telegram group: /connect [token]",
                 ].map((s, i) => (
                   <li key={s} className="flex gap-3">
                     <div className="h-6 w-6 rounded-full bg-primary/10 text-primary text-xs font-semibold flex items-center justify-center shrink-0">{i + 1}</div>
@@ -100,8 +125,20 @@ const Onboarding = () => {
                 ))}
               </ol>
               <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 text-center">
-                <div className="text-xs text-muted-foreground">Your one-time auth code</div>
-                <div className="font-mono text-2xl font-bold tracking-widest mt-1">ACME-7421</div>
+                <div className="text-xs text-muted-foreground">Your connection token</div>
+                <div className="font-mono text-2xl font-bold tracking-widest mt-1 break-all">
+                  {tokenLoading ? "Loading…" : connectionToken ?? "Unavailable"}
+                </div>
+                {connectionToken && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-3"
+                    onClick={() => { navigator.clipboard.writeText(connectionToken); toast.success("Copied!"); }}
+                  >
+                    <Copy className="h-3 w-3 mr-2" /> Copy token
+                  </Button>
+                )}
               </div>
             </div>
           )}
