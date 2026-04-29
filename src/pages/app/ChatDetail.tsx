@@ -5,9 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AttentionBadge, SentimentBadge, PriorityBadge, StatusBadge, TimeAgo } from "@/components/Badges";
-import { ArrowLeft, Hash, MessageSquare, Users, Sparkles, AlertCircle, HelpCircle, Flag, Inbox } from "lucide-react";
+import { ArrowLeft, Hash, MessageSquare, Users, Sparkles, AlertCircle, HelpCircle, Flag, Inbox, Loader2, RefreshCw } from "lucide-react";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, LineChart, Line } from "recharts";
 import { apiFetch } from "@/lib/api";
+import { toast } from "sonner";
 import type { Chat, ActionItem, Message } from "@/lib/mock-data";
 
 interface ChatDetailResponse {
