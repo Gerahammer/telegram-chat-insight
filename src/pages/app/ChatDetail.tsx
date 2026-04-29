@@ -324,11 +324,11 @@ const ChatDetail = () => {
           <div className="flex items-center gap-4">
             {(chat as any).photoUrl ? (
               <img src={(chat as any).photoUrl} alt={chat.name} className="h-12 w-12 rounded-lg object-cover shadow-glow" />
+            ) : (
+              <div className="h-12 w-12 rounded-lg gradient-primary flex items-center justify-center shadow-glow">
+                <Hash className="h-6 w-6 text-primary-foreground" />
               </div>
             )}
-              <div className="h-12 w-12 rounded-lg gradient-primary flex items-center justify-center shadow-glow">
-              <Hash className="h-6 w-6 text-primary-foreground" />
-            </div>
             <div>
               <h1 className="text-2xl md:text-3xl font-bold tracking-tight">{chat.name}</h1>
               <div className="flex flex-wrap items-center gap-2 mt-1 text-sm text-muted-foreground">
