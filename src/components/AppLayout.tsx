@@ -34,21 +34,37 @@ function initials(name?: string, email?: string): string {
   return src.slice(0, 2).toUpperCase();
 }
 
+// Module-level cache so /api/auth/me is only called once per app load,
+// even across remounts (React StrictMode, route changes, etc.).
+let mePromise: Promise<MeResponse | null> | null = null;
+let meCache: MeResponse | null = null;
+
+function loadMe(): Promise<MeResponse | null> {
+  if (meCache) return Promise.resolve(meCache);
+  if (mePromise) return mePromise;
+  mePromise = (async () => {
+    try {
+      const res = await apiFetch("/api/auth/me");
+      if (!res.ok) return null;
+      const data = (await res.json()) as MeResponse;
+      meCache = data;
+      return data;
+    } catch {
+      return null;
+    }
+  })();
+  return mePromise;
+}
+
 export default function AppLayout() {
-  const [me, setMe] = useState<MeResponse | null>(null);
+  const [me, setMe] = useState<MeResponse | null>(meCache);
 
   useEffect(() => {
+    if (meCache) return;
     let cancelled = false;
-    (async () => {
-      try {
-        const res = await apiFetch("/api/auth/me");
-        if (!res.ok) return;
-        const data = (await res.json()) as MeResponse;
-        if (!cancelled) setMe(data);
-      } catch {
-        /* ignore */
-      }
-    })();
+    loadMe().then((data) => {
+      if (!cancelled && data) setMe(data);
+    });
     return () => {
       cancelled = true;
     };
