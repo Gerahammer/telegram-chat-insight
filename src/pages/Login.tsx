@@ -26,7 +26,7 @@ const Login = () => {
       const token = data.token ?? data.accessToken ?? data.jwt;
       if (!token) throw new Error("No auth token in response");
       setAuthToken(token);
-      navigate("/onboarding");
+      navigate("/app");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Login failed");
     } finally {
