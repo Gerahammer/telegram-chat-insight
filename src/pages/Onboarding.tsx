@@ -125,7 +125,7 @@ const Onboarding = () => {
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label>Workspace name</Label>
-                  <Input placeholder="Acme Affiliates" defaultValue="Acme Affiliates" />
+                  <Input placeholder="Acme Affiliates" value={workspaceName} onChange={(e) => setWorkspaceName(e.target.value)} />
                 </div>
                 <div className="space-y-2">
                   <Label>What's your team size?</Label>
