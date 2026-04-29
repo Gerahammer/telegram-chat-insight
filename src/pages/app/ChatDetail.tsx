@@ -47,6 +47,8 @@ const ChatDetail = () => {
               type: rawChat.chatType ?? rawChat.type,
               messagesToday: rawChat.messageCount ?? rawChat.messagesToday,
               lastActivity: rawChat.lastActivityAt ?? rawChat.lastActivity,
+              isActive: rawChat.isActive,
+              todaySummary: rawChat.todaySummary,
             }
           : undefined;
         const normalized: ChatDetailResponse =
