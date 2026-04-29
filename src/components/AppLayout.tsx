@@ -14,6 +14,7 @@ import {
 } from "./ui/dropdown-menu";
 import { Bell, LogOut, User, Building2 } from "lucide-react";
 import { apiFetch, clearAuthToken } from "@/lib/api";
+import { WorkspaceStatsProvider } from "@/lib/workspace-stats";
 
 interface MeResponse {
   name?: string;
@@ -69,6 +70,7 @@ export default function AppLayout() {
 
   return (
     <SidebarProvider>
+     <WorkspaceStatsProvider>
       <div className="min-h-screen flex w-full bg-background">
         <AppSidebar />
         <div className="flex-1 flex flex-col min-w-0">
@@ -119,6 +121,7 @@ export default function AppLayout() {
           </main>
         </div>
       </div>
+     </WorkspaceStatsProvider>
     </SidebarProvider>
   );
 }

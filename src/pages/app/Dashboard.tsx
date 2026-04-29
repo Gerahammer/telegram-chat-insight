@@ -32,11 +32,17 @@ import { apiFetch } from "@/lib/api";
 import type { AttentionStatus } from "@/lib/mock-data";
 
 interface OverviewStats {
+  totalConnectedChats?: number;
   connectedChats?: number;
+  chatsNeedingAttention?: number;
   needAttention?: number;
+  chatsWithNoActivity?: number;
   noActivity?: number;
+  openActionItems?: number;
   openActions?: number;
+  totalMessagesToday?: number;
   messagesToday?: number;
+  averageSentiment?: number | string;
   avgSentiment?: number | string;
   messageVolume?: { day: string; messages: number }[];
   activityBreakdown?: { name: string; value: number; color?: string }[];
@@ -150,16 +156,21 @@ const Dashboard = () => {
     me?.email?.split("@")[0] ||
     "there";
 
-  const totalChats = stats?.connectedChats ?? chats.length ?? 0;
+  const totalChats = stats?.totalConnectedChats ?? stats?.connectedChats ?? chats.length ?? 0;
   const needAttention =
+    stats?.chatsNeedingAttention ??
     stats?.needAttention ??
     chats.filter((c) => c.attention === "needs_attention" || c.attention === "urgent").length;
   const noActivity =
-    stats?.noActivity ?? chats.filter((c) => c.attention === "no_activity").length;
-  const openActions = stats?.openActions ?? openActionsCount ?? 0;
+    stats?.chatsWithNoActivity ??
+    stats?.noActivity ??
+    chats.filter((c) => c.attention === "no_activity").length;
+  const openActions = stats?.openActionItems ?? stats?.openActions ?? openActionsCount ?? 0;
   const messagesToday =
-    stats?.messagesToday ?? chats.reduce((s, c) => s + (c.messagesToday ?? 0), 0);
-  const avgSentiment = stats?.avgSentiment ?? 0;
+    stats?.totalMessagesToday ??
+    stats?.messagesToday ??
+    chats.reduce((s, c) => s + (c.messagesToday ?? 0), 0);
+  const avgSentiment = stats?.averageSentiment ?? stats?.avgSentiment ?? 0;
 
   const messageVolume = stats?.messageVolume ?? [];
   const activityBreakdown =
