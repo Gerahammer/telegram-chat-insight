@@ -1,17 +1,9 @@
 import { NavLink, useLocation } from "react-router-dom";
-import { LayoutDashboard, MessagesSquare, ListTodo, MoonStar, FileText, Settings, CreditCard } from "lucide-react";
+import { LayoutDashboard, MessagesSquare, ListTodo, MoonStar, FileText, Settings, CreditCard, Search, GitCommit } from "lucide-react";
 import {
-  Sidebar,
-  SidebarContent,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarHeader,
-  SidebarFooter,
-  useSidebar,
+  Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent,
+  SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem,
+  SidebarHeader, SidebarFooter, useSidebar,
 } from "@/components/ui/sidebar";
 import { Logo } from "./Logo";
 import { Badge } from "./ui/badge";
@@ -19,7 +11,7 @@ import { useWorkspaceStats } from "@/lib/workspace-stats";
 
 const bottomItems = [
   { title: "Settings", url: "/app/settings", icon: Settings },
-  { title: "Billing", url: "/app/billing", icon: CreditCard },
+  { title: "Billing",  url: "/app/billing",  icon: CreditCard },
 ];
 
 export function AppSidebar() {
@@ -31,27 +23,20 @@ export function AppSidebar() {
   const isActive = (url: string, end?: boolean) =>
     end ? pathname === url : pathname === url || pathname.startsWith(url + "/");
 
-  const items: { title: string; url: string; icon: typeof LayoutDashboard; end?: boolean; badge?: string }[] = [
-    { title: "Dashboard", url: "/app", icon: LayoutDashboard, end: true },
-    {
-      title: "Chats",
-      url: "/app/chats",
-      icon: MessagesSquare,
-      badge: loading ? undefined : String(chatsCount ?? 0),
-    },
-    {
-      title: "Action Items",
-      url: "/app/actions",
-      icon: ListTodo,
-      badge: loading ? undefined : String(openActionsCount ?? 0),
-    },
-    {
-      title: "No Activity",
-      url: "/app/no-activity",
-      icon: MoonStar,
-      badge: loading ? undefined : String(noActivityCount ?? 0),
-    },
-    { title: "Summaries", url: "/app/summaries", icon: FileText },
+  const items: {
+    title: string; url: string; icon: typeof LayoutDashboard;
+    end?: boolean; badge?: string;
+  }[] = [
+    { title: "Dashboard",    url: "/app",              icon: LayoutDashboard, end: true },
+    { title: "Chats",        url: "/app/chats",        icon: MessagesSquare,
+      badge: loading ? undefined : String(chatsCount ?? 0) },
+    { title: "Action Items", url: "/app/actions",      icon: ListTodo,
+      badge: loading ? undefined : String(openActionsCount ?? 0) },
+    { title: "Commitments",  url: "/app/commitments",  icon: GitCommit },
+    { title: "No Activity",  url: "/app/no-activity",  icon: MoonStar,
+      badge: loading ? undefined : String(noActivityCount ?? 0) },
+    { title: "Summaries",    url: "/app/summaries",    icon: FileText },
+    { title: "Search",       url: "/app/search",       icon: Search },
   ];
 
   return (

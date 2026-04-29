@@ -18,6 +18,8 @@ import NoActivity from "./pages/app/NoActivity.tsx";
 import Summaries from "./pages/app/Summaries.tsx";
 import Settings from "./pages/app/Settings.tsx";
 import Billing from "./pages/app/Billing.tsx";
+import SearchPage from "./pages/app/Search.tsx";
+import Commitments from "./pages/app/Commitments.tsx";
 
 const queryClient = new QueryClient();
 
@@ -42,6 +44,8 @@ const App = () => (
             <Route path="summaries" element={<Summaries />} />
             <Route path="settings" element={<Settings />} />
             <Route path="billing" element={<Billing />} />
+            <Route path="search" element={<SearchPage />} />
+            <Route path="commitments" element={<Commitments />} />
           </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>
