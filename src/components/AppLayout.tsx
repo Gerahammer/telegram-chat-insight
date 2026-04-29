@@ -1,13 +1,72 @@
 import { Outlet, NavLink } from "react-router-dom";
+import { useEffect, useState } from "react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "./AppSidebar";
 import { Button } from "./ui/button";
 import { Avatar, AvatarFallback } from "./ui/avatar";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "./ui/dropdown-menu";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "./ui/dropdown-menu";
 import { Bell, LogOut, User, Building2 } from "lucide-react";
+import { apiFetch, clearAuthToken } from "@/lib/api";
+
+interface MeResponse {
+  name?: string;
+  fullName?: string;
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  workspace?: { name?: string };
+  workspaceName?: string;
+}
+
+function initials(name?: string, email?: string): string {
+  const src = name?.trim() || email?.split("@")[0] || "";
+  if (!src) return "U";
+  const parts = src.split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+  return src.slice(0, 2).toUpperCase();
+}
 
 export default function AppLayout() {
+  const [me, setMe] = useState<MeResponse | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await apiFetch("/api/auth/me");
+        if (!res.ok) return;
+        const data = (await res.json()) as MeResponse;
+        if (!cancelled) setMe(data);
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const fullName =
+    me?.fullName ||
+    me?.name ||
+    [me?.firstName, me?.lastName].filter(Boolean).join(" ").trim() ||
+    me?.email?.split("@")[0] ||
+    "";
+  const shortName = fullName.split(" ").slice(0, 2).join(" ") || "Account";
+  const workspaceName = me?.workspace?.name || me?.workspaceName || "My workspace";
+  const email = me?.email ?? "";
+
+  const handleSignOut = () => {
+    clearAuthToken();
+  };
+
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full bg-background">
@@ -17,16 +76,7 @@ export default function AppLayout() {
             <SidebarTrigger />
             <div className="flex items-center gap-2 ml-2">
               <Building2 className="h-4 w-4 text-muted-foreground" />
-              <Select defaultValue="acme">
-                <SelectTrigger className="w-[200px] h-9 border-none shadow-none font-medium">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="acme">Acme Affiliates</SelectItem>
-                  <SelectItem value="growth">Growth Media</SelectItem>
-                  <SelectItem value="new">+ New workspace</SelectItem>
-                </SelectContent>
-              </Select>
+              <span className="text-sm font-medium">{workspaceName}</span>
             </div>
             <div className="ml-auto flex items-center gap-2">
               <Button variant="ghost" size="icon" className="relative">
@@ -37,21 +87,29 @@ export default function AppLayout() {
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="h-9 gap-2 px-2">
                     <Avatar className="h-7 w-7">
-                      <AvatarFallback className="gradient-primary text-primary-foreground text-xs">JD</AvatarFallback>
+                      <AvatarFallback className="gradient-primary text-primary-foreground text-xs">
+                        {initials(fullName, email)}
+                      </AvatarFallback>
                     </Avatar>
-                    <span className="hidden sm:inline text-sm font-medium">Jordan D.</span>
+                    <span className="hidden sm:inline text-sm font-medium">{shortName}</span>
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
                   <DropdownMenuLabel>
-                    <div className="text-sm font-medium">Jordan Davis</div>
-                    <div className="text-xs text-muted-foreground">jordan@acme.io</div>
+                    <div className="text-sm font-medium">{fullName || "Account"}</div>
+                    {email && <div className="text-xs text-muted-foreground">{email}</div>}
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem asChild><NavLink to="/app/settings"><User className="h-4 w-4 mr-2" />Profile</NavLink></DropdownMenuItem>
-                  <DropdownMenuItem asChild><NavLink to="/app/billing"><User className="h-4 w-4 mr-2" />Billing</NavLink></DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <NavLink to="/app/settings"><User className="h-4 w-4 mr-2" />Profile</NavLink>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <NavLink to="/app/billing"><User className="h-4 w-4 mr-2" />Billing</NavLink>
+                  </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem asChild><NavLink to="/login"><LogOut className="h-4 w-4 mr-2" />Sign out</NavLink></DropdownMenuItem>
+                  <DropdownMenuItem asChild onClick={handleSignOut}>
+                    <NavLink to="/login"><LogOut className="h-4 w-4 mr-2" />Sign out</NavLink>
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
