@@ -25,7 +25,8 @@ const Register = () => {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.message || "Registration failed");
       const token = data.token ?? data.accessToken ?? data.jwt;
-      if (token) setAuthToken(token);
+      if (!token) throw new Error("No auth token in response");
+      setAuthToken(token);
       navigate("/onboarding");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Registration failed");
