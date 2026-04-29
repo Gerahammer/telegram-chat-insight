@@ -8,7 +8,7 @@ import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { ArrowLeft, ArrowRight, Building2, Bot, MessagesSquare, Check, Copy, LayoutDashboard } from "lucide-react";
 import { toast } from "sonner";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, getAuthToken } from "@/lib/api";
 
 const BOT_USERNAME = "@Sumerz_bot";
 
@@ -21,32 +21,72 @@ const steps = [
 
 const Onboarding = () => {
   const [step, setStep] = useState(0);
+  const [workspaceName, setWorkspaceName] = useState("Acme Affiliates");
   const [connectionToken, setConnectionToken] = useState<string | null>(null);
   const [tokenLoading, setTokenLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [workspaceCreated, setWorkspaceCreated] = useState(false);
   const navigate = useNavigate();
 
+  // Guard: must be authenticated to run onboarding
   useEffect(() => {
-    let cancelled = false;
-    setTokenLoading(true);
-    apiFetch("/api/workspaces/current/connection-token")
-      .then(async (res) => {
-        if (!res.ok) throw new Error(`Request failed: ${res.status}`);
-        const data = await res.json();
-        if (!cancelled) setConnectionToken(data.connectionToken ?? null);
-      })
-      .catch(() => {
-        if (!cancelled) setConnectionToken(null);
-      })
-      .finally(() => {
-        if (!cancelled) setTokenLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    if (!getAuthToken()) {
+      toast.error("Please sign in to continue onboarding");
+      navigate("/login");
+    }
+  }, [navigate]);
 
-  const next = () => (step < 3 ? setStep(step + 1) : navigate("/app"));
+  const fetchConnectionToken = async () => {
+    setTokenLoading(true);
+    try {
+      const res = await apiFetch("/api/workspaces/current/connection-token");
+      if (!res.ok) throw new Error(`Request failed: ${res.status}`);
+      const data = await res.json();
+      setConnectionToken(data.connectionToken ?? null);
+    } catch {
+      setConnectionToken(null);
+      toast.error("Could not fetch connection token");
+    } finally {
+      setTokenLoading(false);
+    }
+  };
+
+  const createWorkspaceAndContinue = async () => {
+    if (workspaceCreated) {
+      setStep(1);
+      return;
+    }
+    if (!workspaceName.trim()) {
+      toast.error("Please enter a workspace name");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const res = await apiFetch("/api/workspaces", {
+        method: "POST",
+        body: JSON.stringify({ name: workspaceName.trim() }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.message || `Request failed: ${res.status}`);
+      }
+      setWorkspaceCreated(true);
+      setStep(1);
+      fetchConnectionToken();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to create workspace");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const next = () => {
+    if (step === 0) return createWorkspaceAndContinue();
+    if (step < 3) return setStep(step + 1);
+    navigate("/app");
+  };
   const back = () => setStep(Math.max(0, step - 1));
+
 
   return (
     <div className="min-h-screen bg-secondary/30 flex flex-col">
@@ -85,7 +125,7 @@ const Onboarding = () => {
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label>Workspace name</Label>
-                  <Input placeholder="Acme Affiliates" defaultValue="Acme Affiliates" />
+                  <Input placeholder="Acme Affiliates" value={workspaceName} onChange={(e) => setWorkspaceName(e.target.value)} />
                 </div>
                 <div className="space-y-2">
                   <Label>What's your team size?</Label>
@@ -182,8 +222,8 @@ const Onboarding = () => {
 
           <div className="flex justify-between mt-8 pt-6 border-t">
             <Button variant="ghost" onClick={back} disabled={step === 0}><ArrowLeft className="h-4 w-4 mr-2" /> Back</Button>
-            <Button onClick={next} className="gradient-primary border-0">
-              {step === 3 ? "Go to dashboard" : "Continue"} <ArrowRight className="h-4 w-4 ml-2" />
+            <Button onClick={next} disabled={submitting} className="gradient-primary border-0">
+              {step === 0 && submitting ? "Creating…" : step === 3 ? "Go to dashboard" : "Continue"} <ArrowRight className="h-4 w-4 ml-2" />
             </Button>
           </div>
         </Card>
