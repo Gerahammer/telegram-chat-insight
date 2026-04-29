@@ -6,9 +6,10 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { TimeAgo } from "@/components/Badges";
-import { Search, Hash, Inbox, RefreshCw, CheckCircle2, Clock, MessageSquare } from "lucide-react";
+import { Search, Hash, Inbox, RefreshCw, CheckCircle2, Clock, MessageSquare, Plus } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { toast } from "sonner";
+import { ConnectChatDialog } from "@/components/ConnectChatDialog";
 
 interface ApiChat {
   id: string;
@@ -41,6 +42,7 @@ const Chats = () => {
   const [chats, setChats] = useState<ApiChat[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [connectOpen, setConnectOpen] = useState(false);
 
   const fetchChats = useCallback(async (showToast = false) => {
     try {
@@ -84,18 +86,15 @@ const Chats = () => {
             {loading ? "Loading…" : `${chats.length} connected Telegram chat${chats.length === 1 ? "" : "s"}`}
           </p>
         </div>
-        <Button variant="outline" onClick={handleRefresh} disabled={refreshing || loading}>
-          <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? "animate-spin" : ""}`} /> Refresh
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={handleRefresh} disabled={refreshing || loading}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? "animate-spin" : ""}`} /> Refresh
+          </Button>
+          <Button onClick={() => setConnectOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" /> Add chat
+          </Button>
+        </div>
       </div>
-
-      <Card className="p-4 border-dashed bg-secondary/30">
-        <p className="text-sm text-muted-foreground">
-          To connect a new chat, add <span className="font-mono font-semibold text-foreground">@Sumerz_bot</span> to your
-          Telegram group and send <span className="font-mono font-semibold text-foreground">/connect [token]</span> in
-          the group. Your token is shown in onboarding and Settings. Then click Refresh.
-        </p>
-      </Card>
 
       <Card className="p-4">
         <div className="relative max-w-sm">
@@ -112,7 +111,10 @@ const Chats = () => {
         <Card className="py-16 text-center text-muted-foreground">
           <Inbox className="h-10 w-10 mx-auto mb-3 opacity-40" />
           <p className="text-sm">No chats connected yet.</p>
-          <p className="text-xs mt-1">Add @Sumerz_bot to a Telegram group and run /connect [token].</p>
+          <p className="text-xs mt-1 mb-4">Add @Sumerz_bot to a Telegram group to get started.</p>
+          <Button onClick={() => setConnectOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" /> Connect new chat
+          </Button>
         </Card>
       ) : list.length === 0 ? (
         <Card className="py-12 text-center text-muted-foreground text-sm">No chats match your search.</Card>
@@ -151,6 +153,12 @@ const Chats = () => {
           ))}
         </div>
       )}
+
+      <ConnectChatDialog
+        open={connectOpen}
+        onOpenChange={setConnectOpen}
+        onDone={() => fetchChats(true)}
+      />
     </div>
   );
 };
