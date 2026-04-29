@@ -7,54 +7,92 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { PriorityBadge, StatusBadge, TimeAgo } from "@/components/Badges";
 import { Search, ListTodo } from "lucide-react";
 import { apiFetch } from "@/lib/api";
-import type { ActionItem, Chat } from "@/lib/mock-data";
+import { toast } from "sonner";
+
+interface ApiActionItem {
+  id: string;
+  title?: string;
+  description?: string;
+  priority?: string;
+  status?: string;
+  requestedBy?: string;
+  createdAt?: string;
+  summary?: {
+    chat?: { id: string; title: string };
+  };
+}
+
+interface ApiChat {
+  id: string;
+  title: string;
+}
 
 const ActionItems = () => {
   const [priority, setPriority] = useState("all");
   const [status, setStatus] = useState("all");
-  const [chat, setChat] = useState("all");
+  const [chatFilter, setChatFilter] = useState("all");
   const [q, setQ] = useState("");
-  const [items, setItems] = useState<ActionItem[]>([]);
-  const [chats, setChats] = useState<Chat[]>([]);
+  const [items, setItems] = useState<ApiActionItem[]>([]);
+  const [chats, setChats] = useState<ApiChat[]>([]);
   const [loading, setLoading] = useState(true);
+  const [updating, setUpdating] = useState<string | null>(null);
+
+  const fetchItems = async () => {
+    const [itemsRes, chatsRes] = await Promise.all([
+      apiFetch("/api/action-items").catch(() => null),
+      apiFetch("/api/chats").catch(() => null),
+    ]);
+
+    if (itemsRes?.ok) {
+      try {
+        const data = await itemsRes.json();
+        // API returns { actionItems: [...] }
+        const list = Array.isArray(data) ? data : (data?.actionItems ?? data?.items ?? []);
+        setItems(list);
+      } catch { setItems([]); }
+    }
+
+    if (chatsRes?.ok) {
+      try {
+        const data = await chatsRes.json();
+        const list = Array.isArray(data) ? data : (data?.chats ?? data?.items ?? []);
+        setChats(list);
+      } catch { setChats([]); }
+    }
+  };
 
   useEffect(() => {
-    let cancelled = false;
     (async () => {
-      const [itemsRes, chatsRes] = await Promise.all([
-        apiFetch("/api/action-items").catch(() => null),
-        apiFetch("/api/chats").catch(() => null),
-      ]);
-      let itemsList: ActionItem[] = [];
-      let chatsList: Chat[] = [];
-      if (itemsRes?.ok) {
-        try {
-          const data = await itemsRes.json();
-          itemsList = Array.isArray(data) ? data : data?.items ?? [];
-        } catch { /* empty */ }
-      }
-      if (chatsRes?.ok) {
-        try {
-          const data = await chatsRes.json();
-          chatsList = Array.isArray(data) ? data : data?.items ?? [];
-        } catch { /* empty */ }
-      }
-      if (!cancelled) {
-        setItems(itemsList);
-        setChats(chatsList);
-        setLoading(false);
-      }
+      await fetchItems();
+      setLoading(false);
     })();
-    return () => {
-      cancelled = true;
-    };
   }, []);
+
+  const updateStatus = async (id: string, newStatus: string) => {
+    setUpdating(id);
+    try {
+      const res = await apiFetch(`/api/action-items/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ status: newStatus }),
+      });
+      if (!res.ok) throw new Error("Failed to update");
+      setItems(prev => prev.map(item =>
+        item.id === id ? { ...item, status: newStatus } : item
+      ));
+      toast.success(`Marked as ${newStatus.toLowerCase().replace("_", " ")}`);
+    } catch {
+      toast.error("Failed to update action item");
+    } finally {
+      setUpdating(null);
+    }
+  };
 
   const list = items.filter((a) => {
     if (q && !a.title?.toLowerCase().includes(q.toLowerCase())) return false;
-    if (priority !== "all" && a.priority !== priority) return false;
-    if (status !== "all" && a.status !== status) return false;
-    if (chat !== "all" && a.chatId !== chat) return false;
+    // Normalize to lowercase for comparison
+    if (priority !== "all" && (a.priority ?? "").toLowerCase() !== priority) return false;
+    if (status !== "all" && (a.status ?? "").toLowerCase() !== status) return false;
+    if (chatFilter !== "all" && a.summary?.chat?.id !== chatFilter) return false;
     return true;
   });
 
@@ -62,7 +100,9 @@ const ActionItems = () => {
     <div className="space-y-6 max-w-[1400px] mx-auto">
       <div>
         <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Action items</h1>
-        <p className="text-muted-foreground mt-1">Every request and unanswered question detected across your chats.</p>
+        <p className="text-muted-foreground mt-1">
+          {loading ? "Loading…" : `${items.length} total · ${items.filter(i => (i.status ?? "").toLowerCase() === "open").length} open`}
+        </p>
       </div>
 
       <Card className="p-4">
@@ -87,13 +127,14 @@ const ActionItems = () => {
               <SelectItem value="open">Open</SelectItem>
               <SelectItem value="in_progress">In progress</SelectItem>
               <SelectItem value="resolved">Resolved</SelectItem>
+              <SelectItem value="dismissed">Dismissed</SelectItem>
             </SelectContent>
           </Select>
-          <Select value={chat} onValueChange={setChat}>
+          <Select value={chatFilter} onValueChange={setChatFilter}>
             <SelectTrigger className="w-[180px]"><SelectValue placeholder="Chat" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All chats</SelectItem>
-              {chats.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+              {chats.map((c) => <SelectItem key={c.id} value={c.id}>{c.title}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>
@@ -101,39 +142,59 @@ const ActionItems = () => {
 
       <div className="space-y-3">
         {loading ? (
-          <>
-            <Skeleton className="h-24 w-full" />
-            <Skeleton className="h-24 w-full" />
-          </>
+          <><Skeleton className="h-24 w-full" /><Skeleton className="h-24 w-full" /></>
         ) : list.length === 0 ? (
           <Card className="p-12 text-center text-muted-foreground">
             <ListTodo className="h-10 w-10 mx-auto mb-3 opacity-40" />
-            {items.length === 0 ? "No action items yet." : "No action items match your filters."}
+            <p className="text-sm">{items.length === 0 ? "No action items yet. Generate a summary to create some." : "No action items match your filters."}</p>
           </Card>
         ) : (
-          list.map((a) => (
-            <Card key={a.id} className="p-5 hover:shadow-md transition">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="font-semibold">{a.title}</h3>
-                    {a.priority && <PriorityBadge priority={a.priority} />}
-                    {a.status && <StatusBadge status={a.status} />}
+          list.map((a) => {
+            const statusLower = (a.status ?? "open").toLowerCase();
+            const isResolved = statusLower === "resolved" || statusLower === "dismissed";
+            const isInProgress = statusLower === "in_progress";
+            return (
+              <Card key={a.id} className={`p-5 hover:shadow-md transition ${isResolved ? "opacity-60" : ""}`}>
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="font-semibold">{a.title}</h3>
+                      {a.priority && <PriorityBadge priority={a.priority} />}
+                      {a.status && <StatusBadge status={a.status} />}
+                    </div>
+                    {a.description && <p className="text-sm text-muted-foreground mt-1.5">{a.description}</p>}
+                    <div className="flex items-center gap-3 mt-3 text-xs text-muted-foreground">
+                      {a.summary?.chat?.title && <span>💬 {a.summary.chat.title}</span>}
+                      {a.requestedBy && <span>👤 {a.requestedBy}</span>}
+                      {a.createdAt && <TimeAgo iso={a.createdAt} />}
+                    </div>
                   </div>
-                  {a.description && <p className="text-sm text-muted-foreground mt-1.5">{a.description}</p>}
-                  <div className="flex items-center gap-3 mt-3 text-xs text-muted-foreground">
-                    {a.chatName && <span>📁 {a.chatName}</span>}
-                    {a.requestedBy && <span>👤 {a.requestedBy}</span>}
-                    {a.createdAt && <TimeAgo iso={a.createdAt} />}
-                  </div>
+                  {!isResolved && (
+                    <div className="flex gap-2">
+                      {!isInProgress && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={updating === a.id}
+                          onClick={() => updateStatus(a.id, "IN_PROGRESS")}
+                        >
+                          In progress
+                        </Button>
+                      )}
+                      <Button
+                        size="sm"
+                        className="gradient-primary border-0"
+                        disabled={updating === a.id}
+                        onClick={() => updateStatus(a.id, "RESOLVED")}
+                      >
+                        Resolve
+                      </Button>
+                    </div>
+                  )}
                 </div>
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm">Mark in progress</Button>
-                  <Button size="sm" className="gradient-primary border-0">Resolve</Button>
-                </div>
-              </div>
-            </Card>
-          ))
+              </Card>
+            );
+          })
         )}
       </div>
     </div>

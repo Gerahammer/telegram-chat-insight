@@ -9,134 +9,188 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Bot, Copy, Plus, Trash2 } from "lucide-react";
+import { Bot, Copy, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { apiFetch } from "@/lib/api";
 
-interface Member { id?: string; name?: string; email?: string; role?: string; }
+interface Member {
+  userId?: string;
+  role?: string;
+  user?: { name?: string; email?: string };
+}
+
 interface MeResponse {
-  name?: string; fullName?: string; email?: string;
-  workspace?: { name?: string; slug?: string; timezone?: string };
-  workspaceName?: string;
+  user?: { name?: string; email?: string };
+  company?: { name?: string; slug?: string; plan?: string };
+  role?: string;
+}
+
+interface WorkspaceSettings {
+  summaryTime?: string;
+  timezone?: string;
+  aiProvider?: string;
+  notifyEmail?: boolean;
+  retentionDays?: number;
 }
 
 const Settings = () => {
   const [me, setMe] = useState<MeResponse | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [token, setToken] = useState<string | null>(null);
+  const [settings, setSettings] = useState<WorkspaceSettings>({});
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [refreshingToken, setRefreshingToken] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const [meRes, membersRes, tokenRes] = await Promise.all([
+      const [meRes, tokenRes, settingsRes] = await Promise.all([
         apiFetch("/api/auth/me").catch(() => null),
-        apiFetch("/api/workspaces/current/members").catch(() => null),
         apiFetch("/api/workspaces/current/connection-token").catch(() => null),
+        apiFetch("/api/settings").catch(() => null),
       ]);
+
       if (meRes?.ok) {
-        try { if (!cancelled) setMe(await meRes.json()); } catch { /* empty */ }
-      }
-      if (membersRes?.ok) {
         try {
-          const data = await membersRes.json();
-          const list: Member[] = Array.isArray(data) ? data : data?.items ?? [];
-          if (!cancelled) setMembers(list);
+          const data = await meRes.json();
+          if (!cancelled) {
+            setMe(data);
+            // Members come from the company data — use me endpoint for now
+            // showing just the current user
+            setMembers([{ userId: data.user?.email, role: data.role, user: data.user }]);
+          }
         } catch { /* empty */ }
       }
+
       if (tokenRes?.ok) {
         try {
           const data = await tokenRes.json();
-          if (!cancelled) setToken(data?.connectionToken ?? data?.token ?? null);
+          if (!cancelled) setToken(data?.connectionToken ?? null);
         } catch { /* empty */ }
       }
+
+      if (settingsRes?.ok) {
+        try {
+          const data = await settingsRes.json();
+          if (!cancelled) setSettings(data?.settings ?? {});
+        } catch { /* empty */ }
+      }
+
       if (!cancelled) setLoading(false);
     })();
     return () => { cancelled = true; };
   }, []);
 
-  const workspaceName = me?.workspace?.name ?? me?.workspaceName ?? "";
-  const workspaceSlug = me?.workspace?.slug ?? "";
-  const workspaceTz = me?.workspace?.timezone ?? "utc";
+  const handleSaveSettings = async () => {
+    setSaving(true);
+    try {
+      const res = await apiFetch("/api/settings", {
+        method: "PATCH",
+        body: JSON.stringify(settings),
+      });
+      if (!res.ok) throw new Error("Failed to save");
+      toast.success("Settings saved");
+    } catch {
+      toast.error("Failed to save settings");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleRefreshToken = async () => {
+    setRefreshingToken(true);
+    try {
+      const res = await apiFetch("/api/workspaces/current/refresh-connection-token", { method: "POST" });
+      if (!res.ok) throw new Error("Failed");
+      const data = await res.json();
+      setToken(data?.connectionToken ?? null);
+      toast.success("New token generated");
+    } catch {
+      toast.error("Failed to refresh token");
+    } finally {
+      setRefreshingToken(false);
+    }
+  };
+
+  const workspaceName = me?.company?.name ?? "";
+  const workspaceSlug = me?.company?.slug ?? "";
+  const userName = me?.user?.name ?? "";
+  const userEmail = me?.user?.email ?? "";
 
   return (
     <div className="space-y-6 max-w-[1100px] mx-auto">
       <div>
         <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Settings</h1>
-        <p className="text-muted-foreground mt-1">Manage your workspace, team, and AI preferences.</p>
+        <p className="text-muted-foreground mt-1">Manage your workspace and AI preferences.</p>
       </div>
 
       <Tabs defaultValue="workspace">
-        <TabsList className="grid w-full grid-cols-3 lg:grid-cols-6 h-auto">
+        <TabsList className="grid w-full grid-cols-3 lg:grid-cols-5 h-auto">
           <TabsTrigger value="workspace">Workspace</TabsTrigger>
           <TabsTrigger value="team">Team</TabsTrigger>
           <TabsTrigger value="bot">Bot</TabsTrigger>
-          <TabsTrigger value="notifications">Notifications</TabsTrigger>
           <TabsTrigger value="ai">AI summaries</TabsTrigger>
           <TabsTrigger value="data">Data</TabsTrigger>
         </TabsList>
 
+        {/* Workspace */}
         <TabsContent value="workspace" className="mt-6">
           <Card className="p-6 space-y-4 max-w-xl">
             {loading ? (
-              <>
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-10 w-full" />
-              </>
+              <><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /></>
             ) : (
               <>
-                <div className="space-y-2"><Label>Workspace name</Label><Input defaultValue={workspaceName} /></div>
-                <div className="space-y-2"><Label>Workspace URL</Label><Input defaultValue={workspaceSlug} /></div>
-                <div className="space-y-2"><Label>Time zone</Label>
-                  <Select defaultValue={workspaceTz}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="utc">UTC</SelectItem>
-                      <SelectItem value="cet">CET (Europe/Berlin)</SelectItem>
-                      <SelectItem value="est">EST (America/New_York)</SelectItem>
-                    </SelectContent>
-                  </Select>
+                <div className="space-y-2">
+                  <Label>Workspace name</Label>
+                  <Input value={workspaceName} disabled className="bg-muted" />
+                  <p className="text-xs text-muted-foreground">Contact support to change your workspace name.</p>
                 </div>
-                <Button className="gradient-primary border-0">Save changes</Button>
+                <div className="space-y-2">
+                  <Label>Your name</Label>
+                  <Input value={userName} disabled className="bg-muted" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Email</Label>
+                  <Input value={userEmail} disabled className="bg-muted" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Plan</Label>
+                  <div>
+                    <Badge variant="secondary" className="capitalize">{me?.company?.plan?.toLowerCase() ?? "free"}</Badge>
+                  </div>
+                </div>
               </>
             )}
           </Card>
         </TabsContent>
 
+        {/* Team */}
         <TabsContent value="team" className="mt-6">
           <Card className="p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-semibold">Team members</h2>
-              <Button size="sm" className="gradient-primary border-0"><Plus className="h-3 w-3 mr-2" /> Invite</Button>
             </div>
             <div className="space-y-2">
               {loading ? (
-                <>
-                  <Skeleton className="h-14 w-full" />
-                  <Skeleton className="h-14 w-full" />
-                </>
+                <Skeleton className="h-14 w-full" />
               ) : members.length === 0 ? (
-                <p className="text-sm text-muted-foreground py-6 text-center">No team members yet.</p>
+                <p className="text-sm text-muted-foreground py-6 text-center">No team members found.</p>
               ) : (
-                members.map((m) => {
-                  const name = m.name ?? m.email ?? "Member";
-                  const initials = name.split(/\s+/).map((s) => s[0]).join("").slice(0, 2).toUpperCase();
+                members.map((m, i) => {
+                  const name = m.user?.name ?? m.user?.email ?? "Member";
+                  const email = m.user?.email ?? "";
+                  const initials = name.split(/\s+/).map((s: string) => s[0]).join("").slice(0, 2).toUpperCase();
                   return (
-                    <div key={m.id ?? m.email ?? name} className="flex items-center justify-between p-3 border border-border rounded-lg">
+                    <div key={m.userId ?? i} className="flex items-center justify-between p-3 border border-border rounded-lg">
                       <div className="flex items-center gap-3">
                         <Avatar className="h-9 w-9"><AvatarFallback className="text-xs">{initials}</AvatarFallback></Avatar>
                         <div>
                           <div className="font-medium text-sm">{name}</div>
-                          {m.email && <div className="text-xs text-muted-foreground">{m.email}</div>}
+                          {email && <div className="text-xs text-muted-foreground">{email}</div>}
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        {m.role && <Badge variant="secondary">{m.role}</Badge>}
-                        {m.role && m.role.toLowerCase() !== "owner" && (
-                          <Button variant="ghost" size="icon"><Trash2 className="h-4 w-4 text-muted-foreground" /></Button>
-                        )}
-                      </div>
+                      {m.role && <Badge variant="secondary" className="capitalize">{m.role.toLowerCase()}</Badge>}
                     </div>
                   );
                 })
@@ -145,116 +199,108 @@ const Settings = () => {
           </Card>
         </TabsContent>
 
+        {/* Bot */}
         <TabsContent value="bot" className="mt-6">
           <Card className="p-6 max-w-2xl">
             <div className="flex items-center gap-3 mb-4">
-              <div className="h-10 w-10 rounded-lg gradient-primary flex items-center justify-center"><Bot className="h-5 w-5 text-primary-foreground" /></div>
+              <div className="h-10 w-10 rounded-lg gradient-primary flex items-center justify-center">
+                <Bot className="h-5 w-5 text-primary-foreground" />
+              </div>
               <div>
                 <h2 className="font-semibold">Telegram bot connection</h2>
                 <p className="text-sm text-muted-foreground">Add @Sumerz_bot to any group to start monitoring.</p>
               </div>
             </div>
-            <ol className="space-y-3 text-sm">
+            <ol className="space-y-3 text-sm mb-6">
               {[
-                "Add @Sumerz_bot to your Telegram group",
-                "Make the bot an admin",
-                "Send /connect [token] in the group",
-                "Return to the dashboard to confirm the connection",
+                "Add @Sumerz_bot to your Telegram group (no admin needed)",
+                "Copy your connection token below",
+                "Send /connect [token] in the group — bot deletes it instantly",
+                "Click refresh on the Chats page to see the new group",
               ].map((s, i) => (
-                <li key={s} className="flex gap-3 items-start">
+                <li key={i} className="flex gap-3 items-start">
                   <div className="h-6 w-6 rounded-full bg-primary/10 text-primary text-xs font-semibold flex items-center justify-center shrink-0">{i + 1}</div>
                   <span>{s}</span>
                 </li>
               ))}
             </ol>
-            <div className="mt-6 p-4 rounded-lg border border-primary/20 bg-primary/5 flex items-center justify-between">
-              <div>
-                <div className="text-xs text-muted-foreground">Workspace connection token</div>
+            <div className="p-4 rounded-lg border border-primary/20 bg-primary/5">
+              <div className="text-xs text-muted-foreground mb-1">Connection token (one-time use)</div>
+              <div className="flex items-center justify-between gap-3">
                 <div className="font-mono text-lg font-bold">
-                  {loading ? <Skeleton className="h-6 w-32" /> : token ?? "Unavailable"}
+                  {loading ? <Skeleton className="h-6 w-32 inline-block" /> : token ?? "Unavailable"}
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" disabled={!token} onClick={() => { if (token) { navigator.clipboard.writeText(`/connect ${token}`); toast.success("Command copied!"); } }}>
+                    <Copy className="h-3 w-3 mr-2" /> Copy command
+                  </Button>
+                  <Button variant="outline" size="sm" disabled={refreshingToken} onClick={handleRefreshToken}>
+                    <RefreshCw className={`h-3 w-3 mr-2 ${refreshingToken ? "animate-spin" : ""}`} /> New token
+                  </Button>
                 </div>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={!token}
-                onClick={() => {
-                  if (!token) return;
-                  navigator.clipboard.writeText(token);
-                  toast.success("Copied!");
-                }}
-              >
-                <Copy className="h-3 w-3 mr-2" />Copy
-              </Button>
             </div>
           </Card>
         </TabsContent>
 
-        <TabsContent value="notifications" className="mt-6">
-          <Card className="p-6 space-y-4 max-w-xl">
-            {[
-              { t: "Daily email digest", d: "Receive a summary of all chats every morning." },
-              { t: "Urgent alerts", d: "Get notified instantly when a chat needs urgent attention." },
-              { t: "Slack notifications", d: "Send digests and alerts to your Slack workspace." },
-              { t: "Weekly report", d: "A weekly performance digest sent every Monday." },
-            ].map((n, i) => (
-              <div key={n.t} className="flex items-start justify-between gap-4 py-2">
-                <div>
-                  <Label>{n.t}</Label>
-                  <p className="text-xs text-muted-foreground mt-0.5">{n.d}</p>
-                </div>
-                <Switch defaultChecked={i < 2} />
-              </div>
-            ))}
-          </Card>
-        </TabsContent>
-
+        {/* AI Summaries */}
         <TabsContent value="ai" className="mt-6">
           <Card className="p-6 space-y-4 max-w-xl">
             <div className="space-y-2">
-              <Label>Summary length</Label>
-              <Select defaultValue="medium">
+              <Label>Daily summary time (UTC)</Label>
+              <Select
+                value={settings.summaryTime ?? "08:00"}
+                onValueChange={(v) => setSettings(s => ({ ...s, summaryTime: v }))}
+              >
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="short">Short (2-3 sentences)</SelectItem>
-                  <SelectItem value="medium">Medium (1 paragraph)</SelectItem>
-                  <SelectItem value="long">Detailed (multi-paragraph)</SelectItem>
+                  {["06:00","07:00","08:00","09:00","10:00","12:00","18:00","20:00"].map(t => (
+                    <SelectItem key={t} value={t}>{t} UTC</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Summary tone</Label>
-              <Select defaultValue="neutral">
+              <Label>Timezone</Label>
+              <Select
+                value={settings.timezone ?? "UTC"}
+                onValueChange={(v) => setSettings(s => ({ ...s, timezone: v }))}
+              >
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="neutral">Neutral & factual</SelectItem>
-                  <SelectItem value="friendly">Friendly</SelectItem>
-                  <SelectItem value="executive">Executive briefing</SelectItem>
+                  <SelectItem value="UTC">UTC</SelectItem>
+                  <SelectItem value="Europe/Berlin">CET (Europe/Berlin)</SelectItem>
+                  <SelectItem value="Europe/London">GMT (Europe/London)</SelectItem>
+                  <SelectItem value="America/New_York">EST (New York)</SelectItem>
+                  <SelectItem value="Asia/Singapore">SGT (Singapore)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="flex items-start justify-between gap-4 py-2">
               <div>
-                <Label>Detect action items</Label>
-                <p className="text-xs text-muted-foreground mt-0.5">Automatically extract tasks from conversations.</p>
+                <Label>Email notifications</Label>
+                <p className="text-xs text-muted-foreground mt-0.5">Receive daily summary emails.</p>
               </div>
-              <Switch defaultChecked />
+              <Switch
+                checked={settings.notifyEmail ?? true}
+                onCheckedChange={(v) => setSettings(s => ({ ...s, notifyEmail: v }))}
+              />
             </div>
-            <div className="flex items-start justify-between gap-4 py-2">
-              <div>
-                <Label>Sentiment tracking</Label>
-                <p className="text-xs text-muted-foreground mt-0.5">Score the overall sentiment of each chat.</p>
-              </div>
-              <Switch defaultChecked />
-            </div>
+            <Button className="gradient-primary border-0" onClick={handleSaveSettings} disabled={saving}>
+              {saving ? "Saving..." : "Save changes"}
+            </Button>
           </Card>
         </TabsContent>
 
+        {/* Data */}
         <TabsContent value="data" className="mt-6">
           <Card className="p-6 space-y-4 max-w-xl">
             <div className="space-y-2">
               <Label>Data retention</Label>
-              <Select defaultValue="90">
+              <Select
+                value={String(settings.retentionDays ?? 90)}
+                onValueChange={(v) => setSettings(s => ({ ...s, retentionDays: parseInt(v) }))}
+              >
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="30">30 days</SelectItem>
@@ -263,10 +309,11 @@ const Settings = () => {
                   <SelectItem value="365">1 year</SelectItem>
                 </SelectContent>
               </Select>
-              <p className="text-xs text-muted-foreground">Older messages are automatically deleted from our servers.</p>
+              <p className="text-xs text-muted-foreground">Older messages are automatically deleted.</p>
             </div>
-            <Button variant="outline">Export workspace data</Button>
-            <Button variant="outline" className="text-destructive border-destructive/30 hover:bg-destructive/10">Delete workspace</Button>
+            <Button className="gradient-primary border-0" onClick={handleSaveSettings} disabled={saving}>
+              {saving ? "Saving..." : "Save changes"}
+            </Button>
           </Card>
         </TabsContent>
       </Tabs>
