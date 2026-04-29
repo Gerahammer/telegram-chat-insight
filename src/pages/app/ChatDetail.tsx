@@ -7,12 +7,14 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { AttentionBadge, SentimentBadge, PriorityBadge, StatusBadge, TimeAgo } from "@/components/Badges";
 import {
   ArrowLeft, Hash, MessageSquare, Users, Sparkles, AlertCircle,
-  HelpCircle, Flag, Inbox, Loader2, RefreshCw, Calendar, Star,
+  HelpCircle, Flag, Inbox, Loader2, RefreshCw, Calendar, Star, ChevronDown,
 } from "lucide-react";
-import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 import { apiFetch } from "@/lib/api";
 import { toast } from "sonner";
 import type { Chat, ActionItem, Message } from "@/lib/mock-data";
+import {
+  Popover, PopoverContent, PopoverTrigger,
+} from "@/components/ui/popover";
 
 interface PersonalHighlight {
   message: string;
@@ -37,34 +39,133 @@ interface SummaryData {
 
 interface ChatDetailData {
   chat?: Chat & { memberCount?: number; lastSummarizedAt?: string };
-  summary?: string;
-  summaryUpdatedAt?: string;
-  summaryData?: SummaryData;
+  summaries?: SummaryData[];
   personalHighlights?: PersonalHighlight[];
-  messageVolume?: { day: string; messages: number }[];
-  actionItems?: ActionItem[];
   messages?: Message[];
 }
 
-// ─── Date picker helpers ──────────────────────────────────────────────────────
+// ─── Date helpers ─────────────────────────────────────────────────────────────
 
-function formatDateLabel(iso: string): string {
-  const d = new Date(iso);
-  const today = new Date(); today.setHours(0, 0, 0, 0);
-  const yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1);
-  if (d >= today) return "Today";
-  if (d >= yesterday) return "Yesterday";
-  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+function toDateStr(d: Date): string {
+  return d.toISOString().slice(0, 10);
 }
 
-function getLast7Days(): string[] {
-  return Array.from({ length: 7 }, (_, i) => {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    d.setHours(0, 0, 0, 0);
-    return d.toISOString().slice(0, 10);
-  });
+function today(): string { return toDateStr(new Date()); }
+
+function daysAgo(n: number): string {
+  const d = new Date(); d.setDate(d.getDate() - n); return toDateStr(d);
 }
+
+function formatDisplay(from: string, to: string): string {
+  if (from === to) {
+    if (from === today()) return "Today";
+    if (from === daysAgo(1)) return "Yesterday";
+    return new Date(from).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  }
+  const f = new Date(from).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  const t = new Date(to).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  return `${f} – ${t}`;
+}
+
+// Quick range presets
+const PRESETS = [
+  { label: "Today",      from: () => today(),    to: () => today() },
+  { label: "Yesterday",  from: () => daysAgo(1), to: () => daysAgo(1) },
+  { label: "Last 3 days",from: () => daysAgo(2), to: () => today() },
+  { label: "Last 7 days",from: () => daysAgo(6), to: () => today() },
+  { label: "Last 14 days",from: () => daysAgo(13),to: () => today() },
+  { label: "Last 30 days",from: () => daysAgo(29),to: () => today() },
+];
+
+// ─── DateRangePicker ──────────────────────────────────────────────────────────
+
+interface DateRangePickerProps {
+  from: string;
+  to: string;
+  onChange: (from: string, to: string) => void;
+}
+
+function DateRangePicker({ from, to, onChange }: DateRangePickerProps) {
+  const [open, setOpen] = useState(false);
+  const [tempFrom, setTempFrom] = useState(from);
+  const [tempTo, setTempTo] = useState(to);
+
+  const applyPreset = (preset: typeof PRESETS[0]) => {
+    const f = preset.from(); const t = preset.to();
+    onChange(f, t);
+    setTempFrom(f); setTempTo(t);
+    setOpen(false);
+  };
+
+  const applyCustom = () => {
+    if (tempFrom > tempTo) { toast.error("Start date must be before end date"); return; }
+    onChange(tempFrom, tempTo);
+    setOpen(false);
+  };
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="outline" size="sm" className="gap-2">
+          <Calendar className="h-3.5 w-3.5" />
+          {formatDisplay(from, to)}
+          <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-72 p-0">
+        {/* Presets */}
+        <div className="p-2 border-b">
+          <p className="text-xs text-muted-foreground px-2 py-1 font-medium">Quick select</p>
+          {PRESETS.map(p => (
+            <button
+              key={p.label}
+              onClick={() => applyPreset(p)}
+              className={`w-full text-left px-3 py-2 text-sm rounded-md hover:bg-muted transition ${
+                p.label === formatDisplay(from, to) || (p.from() === from && p.to() === to)
+                  ? "bg-primary/10 text-primary font-medium"
+                  : ""
+              }`}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+        {/* Custom range */}
+        <div className="p-3 space-y-3">
+          <p className="text-xs text-muted-foreground font-medium">Custom range</p>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">From</label>
+              <input
+                type="date"
+                value={tempFrom}
+                max={tempTo}
+                onChange={e => setTempFrom(e.target.value)}
+                className="w-full text-sm border rounded-md px-2 py-1.5 bg-background"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">To</label>
+              <input
+                type="date"
+                value={tempTo}
+                min={tempFrom}
+                max={today()}
+                onChange={e => setTempTo(e.target.value)}
+                className="w-full text-sm border rounded-md px-2 py-1.5 bg-background"
+              />
+            </div>
+          </div>
+          <Button size="sm" className="w-full" onClick={applyCustom}>
+            Apply range
+          </Button>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+// ─── Main component ───────────────────────────────────────────────────────────
 
 const ChatDetail = () => {
   const { id } = useParams();
@@ -72,8 +173,9 @@ const ChatDetail = () => {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [generating, setGenerating] = useState(false);
-  const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().slice(0, 10));
   const [summaryLoading, setSummaryLoading] = useState(false);
+  const [dateFrom, setDateFrom] = useState(today());
+  const [dateTo, setDateTo] = useState(today());
 
   // Fetch chat + messages once
   useEffect(() => {
@@ -124,7 +226,7 @@ const ChatDetail = () => {
     return () => { cancelled = true; };
   }, [id]);
 
-  // Fetch summary for selected date
+  // Fetch summaries for selected date range
   useEffect(() => {
     if (!id || !data?.chat) return;
     let cancelled = false;
@@ -132,25 +234,29 @@ const ChatDetail = () => {
 
     (async () => {
       try {
-        const res = await apiFetch(`/api/chats/${encodeURIComponent(id)}/summaries?date=${selectedDate}`);
-        if (!res.ok) { if (!cancelled) setData(prev => prev ? { ...prev, summaryData: undefined } : prev); return; }
+        // Fetch all summaries in range by getting paginated results
+        // For a range, we fetch without date filter and filter client-side
+        const res = await apiFetch(`/api/chats/${encodeURIComponent(id)}/summaries?limit=60`);
+        if (!res.ok) { if (!cancelled) setData(prev => prev ? { ...prev, summaries: [] } : prev); return; }
+
         const json: any = await res.json();
-        const summaries: SummaryData[] = Array.isArray(json) ? json : (json?.summaries ?? []);
-        if (!cancelled) {
-          setData(prev => prev ? {
-            ...prev,
-            summaryData: summaries[0] ?? undefined,
-            actionItems: summaries[0]?.actionItems ?? [],
-          } : prev);
-        }
+        const all: SummaryData[] = Array.isArray(json) ? json : (json?.summaries ?? []);
+
+        // Filter by date range
+        const filtered = all.filter(s => {
+          const d = s.date?.slice(0, 10) ?? "";
+          return d >= dateFrom && d <= dateTo;
+        });
+
+        if (!cancelled) setData(prev => prev ? { ...prev, summaries: filtered } : prev);
       } catch {
-        if (!cancelled) setData(prev => prev ? { ...prev, summaryData: undefined } : prev);
+        if (!cancelled) setData(prev => prev ? { ...prev, summaries: [] } : prev);
       } finally {
         if (!cancelled) setSummaryLoading(false);
       }
     })();
     return () => { cancelled = true; };
-  }, [id, selectedDate, data?.chat]);
+  }, [id, dateFrom, dateTo, data?.chat]);
 
   const handleGenerateSummary = async () => {
     if (!id || generating) return;
@@ -168,16 +274,13 @@ const ChatDetail = () => {
         return;
       }
 
-      // Update with new summary and personal highlights
+      // Reset to today and reload
+      setDateFrom(today()); setDateTo(today());
       setData(prev => prev ? {
         ...prev,
-        summaryData: body?.summary ?? prev.summaryData,
         personalHighlights: body?.personalHighlights ?? [],
-        actionItems: body?.summary?.actionItems ?? prev.actionItems,
       } : prev);
 
-      // Reset to today
-      setSelectedDate(new Date().toISOString().slice(0, 10));
       toast.success("Summary generated!");
     } catch (err: any) {
       toast.error(err?.message || "Failed to generate summary");
@@ -191,10 +294,7 @@ const ChatDetail = () => {
       <div className="space-y-6 max-w-[1400px] mx-auto">
         <Skeleton className="h-10 w-64" />
         <Skeleton className="h-32 w-full" />
-        <div className="grid lg:grid-cols-2 gap-6">
-          <Skeleton className="h-64 w-full" />
-          <Skeleton className="h-64 w-full" />
-        </div>
+        <div className="grid lg:grid-cols-2 gap-6"><Skeleton className="h-64 w-full" /><Skeleton className="h-64 w-full" /></div>
       </div>
     );
   }
@@ -215,10 +315,15 @@ const ChatDetail = () => {
 
   const chat = data.chat;
   const messages = data.messages ?? [];
-  const actions = data.actionItems ?? data.summaryData?.actionItems ?? [];
-  const summaryText = data.summaryData?.summaryText ?? data.summaryData?.summary;
+  const summaries = data.summaries ?? [];
   const personalHighlights = data.personalHighlights ?? [];
-  const days = getLast7Days();
+
+  // Merge action items and unanswered questions across all summaries in range
+  const allActions = summaries.flatMap(s => s.actionItems ?? []);
+  const allUnanswered = summaries.flatMap(s => s.unansweredQuestions ?? []);
+
+  // Combined summary text for range (show each day separately or merged)
+  const isMultiDay = dateFrom !== dateTo;
 
   return (
     <div className="space-y-6 max-w-[1400px] mx-auto">
@@ -236,31 +341,22 @@ const ChatDetail = () => {
             <div>
               <h1 className="text-2xl md:text-3xl font-bold tracking-tight">{chat.name}</h1>
               <div className="flex flex-wrap items-center gap-3 mt-1 text-sm text-muted-foreground">
-                {chat.type && <Badge variant="secondary" className="capitalize">{chat.type}</Badge>}
+                {chat.type && <Badge variant="secondary" className="capitalize">{String(chat.type).toLowerCase()}</Badge>}
                 {chat.memberCount != null && (
-                  <span className="flex items-center gap-1">
-                    <Users className="h-3 w-3" /> {chat.memberCount} members
-                  </span>
+                  <span className="flex items-center gap-1"><Users className="h-3 w-3" /> {chat.memberCount} members</span>
                 )}
                 {chat.lastActivity && (
-                  <span className="flex items-center gap-1">
-                    Last activity: <TimeAgo iso={chat.lastActivity} />
-                  </span>
+                  <span className="flex items-center gap-1">Last activity: <TimeAgo iso={chat.lastActivity} /></span>
                 )}
                 <span className="flex items-center gap-1">
                   <MessageSquare className="h-3 w-3" /> {chat.messagesToday ?? 0} messages today
                 </span>
-                {chat.lastSummarizedAt && (
-                  <span className="flex items-center gap-1 text-xs">
-                    Last summarized: <TimeAgo iso={chat.lastSummarizedAt} />
+                {(chat as any).lastSummarizedAt && (
+                  <span className="text-xs flex items-center gap-1">
+                    Last summarized: <TimeAgo iso={(chat as any).lastSummarizedAt} />
                   </span>
                 )}
-                <Badge
-                  variant="outline"
-                  className={chat.isActive
-                    ? "bg-success/10 text-success border-success/20"
-                    : "bg-muted text-muted-foreground border-border"}
-                >
+                <Badge variant="outline" className={chat.isActive ? "bg-success/10 text-success border-success/20" : "bg-muted text-muted-foreground"}>
                   {chat.isActive ? "Active" : "Inactive"}
                 </Badge>
               </div>
@@ -269,73 +365,79 @@ const ChatDetail = () => {
         </div>
       </div>
 
-      {/* AI Summary Card */}
+      {/* AI Summary card */}
       <Card className="p-6 bg-gradient-to-br from-primary/5 to-primary-glow/5 border-primary/20">
         <div className="flex items-start gap-3">
           <div className="h-9 w-9 rounded-lg gradient-primary flex items-center justify-center shrink-0">
             <Sparkles className="h-4 w-4 text-primary-foreground" />
           </div>
           <div className="flex-1 min-w-0">
-            {/* Header row */}
             <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
               <h2 className="font-semibold">AI Summary</h2>
               <div className="flex items-center gap-2">
-                {/* Date selector */}
-                <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
-                  <Calendar className="h-3.5 w-3.5 text-muted-foreground ml-1" />
-                  {days.map(day => (
-                    <button
-                      key={day}
-                      onClick={() => setSelectedDate(day)}
-                      className={`px-2 py-1 rounded text-xs font-medium transition ${
-                        selectedDate === day
-                          ? "bg-background shadow text-foreground"
-                          : "text-muted-foreground hover:text-foreground"
-                      }`}
-                    >
-                      {formatDateLabel(day)}
-                    </button>
-                  ))}
-                </div>
+                <DateRangePicker
+                  from={dateFrom}
+                  to={dateTo}
+                  onChange={(f, t) => { setDateFrom(f); setDateTo(t); }}
+                />
                 <Button size="sm" variant="outline" onClick={handleGenerateSummary} disabled={generating}>
-                  {generating ? <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5 mr-2" />}
+                  {generating
+                    ? <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" />
+                    : <RefreshCw className="h-3.5 w-3.5 mr-2" />}
                   {generating ? "Generating..." : "Generate now"}
                 </Button>
               </div>
             </div>
 
-            {/* Summary content */}
             {summaryLoading || generating ? (
               <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
                 <Loader2 className="h-4 w-4 animate-spin" />
-                <span>{generating ? "Generating AI summary..." : "Loading summary..."}</span>
+                <span>{generating ? "Generating AI summary..." : "Loading summaries..."}</span>
               </div>
-            ) : summaryText ? (
-              <p className="text-sm leading-relaxed text-foreground/90">{summaryText}</p>
-            ) : (
+            ) : summaries.length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                No summary available for {formatDateLabel(selectedDate)}.
-                {selectedDate === new Date().toISOString().slice(0, 10) && " Click \"Generate now\" to create one."}
+                No summaries found for {formatDisplay(dateFrom, dateTo)}.
+                {dateFrom === today() && " Click \"Generate now\" to create one."}
               </p>
-            )}
-
-            {/* Metadata badges */}
-            {data.summaryData && !summaryLoading && (
-              <div className="flex flex-wrap gap-2 mt-3">
-                {data.summaryData.sentiment && (
-                  <SentimentBadge sentiment={data.summaryData.sentiment as any} />
-                )}
-                {data.summaryData.requiresAttention && (
-                  <Badge variant="outline" className="text-warning border-warning/30 bg-warning/10 text-xs">
-                    Needs attention
-                  </Badge>
-                )}
-                {data.summaryData.generatedAt && (
-                  <span className="text-xs text-muted-foreground">
-                    Generated <TimeAgo iso={data.summaryData.generatedAt} />
-                  </span>
-                )}
+            ) : isMultiDay ? (
+              // Multi-day: show each day as a card
+              <div className="space-y-3">
+                <p className="text-xs text-muted-foreground">{summaries.length} summaries for {formatDisplay(dateFrom, dateTo)}</p>
+                {summaries.map(s => (
+                  <div key={s.id} className="p-3 rounded-lg border border-primary/10 bg-background/50">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-medium text-muted-foreground">
+                        {s.date ? new Date(s.date).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" }) : ""}
+                      </span>
+                      <div className="flex gap-1">
+                        {s.sentiment && <SentimentBadge sentiment={s.sentiment as any} />}
+                        {s.requiresAttention && <Badge variant="outline" className="text-warning border-warning/30 bg-warning/10 text-xs">Needs attention</Badge>}
+                      </div>
+                    </div>
+                    <p className="text-sm leading-relaxed">
+                      {s.noActivity ? "No activity on this day." : (s.summaryText ?? s.summary ?? "")}
+                    </p>
+                  </div>
+                ))}
               </div>
+            ) : (
+              // Single day
+              <>
+                <p className="text-sm leading-relaxed text-foreground/90">
+                  {summaries[0].noActivity
+                    ? "No messages recorded on this day."
+                    : (summaries[0].summaryText ?? summaries[0].summary ?? "")}
+                </p>
+                <div className="flex flex-wrap gap-2 mt-3">
+                  {summaries[0].sentiment && <SentimentBadge sentiment={summaries[0].sentiment as any} />}
+                  {summaries[0].requiresAttention && (
+                    <Badge variant="outline" className="text-warning border-warning/30 bg-warning/10 text-xs">Needs attention</Badge>
+                  )}
+                  {summaries[0].generatedAt && (
+                    <span className="text-xs text-muted-foreground">Generated <TimeAgo iso={summaries[0].generatedAt} /></span>
+                  )}
+                </div>
+              </>
             )}
           </div>
         </div>
@@ -343,7 +445,7 @@ const ChatDetail = () => {
 
       {/* Personal Highlights */}
       {personalHighlights.length > 0 && (
-        <Card className="p-6 border-primary/30 bg-primary/3">
+        <Card className="p-6 border-primary/30">
           <h2 className="font-semibold flex items-center gap-2 mb-4">
             <Star className="h-4 w-4 text-primary" /> For you
             <Badge variant="secondary" className="text-xs">{personalHighlights.length}</Badge>
@@ -367,12 +469,13 @@ const ChatDetail = () => {
         <Card className="p-6">
           <h2 className="font-semibold flex items-center gap-2 mb-4">
             <AlertCircle className="h-4 w-4 text-warning" /> Action items
+            {allActions.length > 0 && <Badge variant="secondary" className="text-xs">{allActions.length}</Badge>}
           </h2>
           <div className="space-y-2">
-            {actions.length === 0
+            {allActions.length === 0
               ? <p className="text-sm text-muted-foreground">No action items for this period.</p>
-              : actions.map((a: any) => (
-                <div key={a.id} className="p-3 rounded-lg border border-border">
+              : allActions.map((a: any, i: number) => (
+                <div key={a.id ?? i} className="p-3 rounded-lg border border-border">
                   <div className="flex items-start justify-between gap-2">
                     <div className="font-medium text-sm">{a.title}</div>
                     {a.priority && <PriorityBadge priority={a.priority} />}
@@ -392,11 +495,12 @@ const ChatDetail = () => {
         <Card className="p-6">
           <h2 className="font-semibold flex items-center gap-2 mb-4">
             <HelpCircle className="h-4 w-4 text-primary" /> Unanswered questions
+            {allUnanswered.length > 0 && <Badge variant="secondary" className="text-xs">{allUnanswered.length}</Badge>}
           </h2>
           <div className="space-y-2">
-            {(data.summaryData?.unansweredQuestions ?? []).length === 0
+            {allUnanswered.length === 0
               ? <p className="text-sm text-muted-foreground">No unanswered questions.</p>
-              : (data.summaryData?.unansweredQuestions ?? []).map((q, i) => (
+              : allUnanswered.map((q, i) => (
                 <div key={i} className="p-3 rounded-lg border border-border bg-warning/5">
                   <p className="text-sm">{q}</p>
                 </div>
