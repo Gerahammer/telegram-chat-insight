@@ -5,6 +5,19 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import Index from "./pages/Index.tsx";
 import NotFound from "./pages/NotFound.tsx";
+import Login from "./pages/Login.tsx";
+import Register from "./pages/Register.tsx";
+import ForgotPassword from "./pages/ForgotPassword.tsx";
+import Onboarding from "./pages/Onboarding.tsx";
+import AppLayout from "./components/AppLayout.tsx";
+import Dashboard from "./pages/app/Dashboard.tsx";
+import Chats from "./pages/app/Chats.tsx";
+import ChatDetail from "./pages/app/ChatDetail.tsx";
+import ActionItems from "./pages/app/ActionItems.tsx";
+import NoActivity from "./pages/app/NoActivity.tsx";
+import Summaries from "./pages/app/Summaries.tsx";
+import Settings from "./pages/app/Settings.tsx";
+import Billing from "./pages/app/Billing.tsx";
 
 const queryClient = new QueryClient();
 
@@ -16,7 +29,20 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Index />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/onboarding" element={<Onboarding />} />
+          <Route path="/app" element={<AppLayout />}>
+            <Route index element={<Dashboard />} />
+            <Route path="chats" element={<Chats />} />
+            <Route path="chats/:id" element={<ChatDetail />} />
+            <Route path="actions" element={<ActionItems />} />
+            <Route path="no-activity" element={<NoActivity />} />
+            <Route path="summaries" element={<Summaries />} />
+            <Route path="settings" element={<Settings />} />
+            <Route path="billing" element={<Billing />} />
+          </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
