@@ -268,7 +268,12 @@ const ChatDetail = () => {
       <Card className="p-6">
         <h2 className="font-semibold flex items-center gap-2 mb-4"><Flag className="h-4 w-4" /> Recent messages</h2>
         <div className="space-y-3">
-          {messages.length === 0 && <p className="text-sm text-muted-foreground">Recent messages will appear here.</p>}
+          {messages.length === 0 && (
+            <div className="py-8 text-center text-muted-foreground">
+              <Inbox className="h-8 w-8 mx-auto mb-2 opacity-40" />
+              <p className="text-sm">No messages yet — send some messages in your Telegram group</p>
+            </div>
+          )}
           {messages.map((m) => (
             <div key={m.id} className="flex gap-3">
               <div className="h-8 w-8 rounded-full bg-secondary flex items-center justify-center text-xs font-semibold shrink-0">
