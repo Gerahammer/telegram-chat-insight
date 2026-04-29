@@ -222,8 +222,8 @@ const Onboarding = () => {
 
           <div className="flex justify-between mt-8 pt-6 border-t">
             <Button variant="ghost" onClick={back} disabled={step === 0}><ArrowLeft className="h-4 w-4 mr-2" /> Back</Button>
-            <Button onClick={next} className="gradient-primary border-0">
-              {step === 3 ? "Go to dashboard" : "Continue"} <ArrowRight className="h-4 w-4 ml-2" />
+            <Button onClick={next} disabled={submitting} className="gradient-primary border-0">
+              {step === 0 && submitting ? "Creating…" : step === 3 ? "Go to dashboard" : "Continue"} <ArrowRight className="h-4 w-4 ml-2" />
             </Button>
           </div>
         </Card>
