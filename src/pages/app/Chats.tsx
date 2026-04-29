@@ -86,18 +86,15 @@ const Chats = () => {
             {loading ? "Loading…" : `${chats.length} connected Telegram chat${chats.length === 1 ? "" : "s"}`}
           </p>
         </div>
-        <Button variant="outline" onClick={handleRefresh} disabled={refreshing || loading}>
-          <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? "animate-spin" : ""}`} /> Refresh
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={handleRefresh} disabled={refreshing || loading}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? "animate-spin" : ""}`} /> Refresh
+          </Button>
+          <Button onClick={() => setConnectOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" /> Add chat
+          </Button>
+        </div>
       </div>
-
-      <Card className="p-4 border-dashed bg-secondary/30">
-        <p className="text-sm text-muted-foreground">
-          To connect a new chat, add <span className="font-mono font-semibold text-foreground">@Sumerz_bot</span> to your
-          Telegram group and send <span className="font-mono font-semibold text-foreground">/connect [token]</span> in
-          the group. Your token is shown in onboarding and Settings. Then click Refresh.
-        </p>
-      </Card>
 
       <Card className="p-4">
         <div className="relative max-w-sm">
