@@ -6,67 +6,39 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { TimeAgo } from "@/components/Badges";
-import { Search, Hash, Inbox, RefreshCw, CheckCircle2, Clock } from "lucide-react";
+import { Search, Hash, Inbox, RefreshCw, CheckCircle2, Clock, MessageSquare } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { toast } from "sonner";
 
-interface ChatRow {
+interface ApiChat {
   id: string;
   title: string;
-  lastActivity: string | null;
-  summaryStatus: "ready" | "pending" | "none";
-  type?: string;
-  members?: number;
-  messagesToday?: number;
+  telegramChatId?: string | number;
+  chatType?: string;
+  isActive?: boolean;
+  lastActivityAt?: string | null;
+  messageCount?: number;
+  todaySummary?: string | null;
 }
 
-// Normalize whatever the backend returns into a stable row shape.
-const normalize = (raw: any): ChatRow => {
-  const title =
-    raw?.title ?? raw?.name ?? raw?.chatTitle ?? raw?.chat_name ?? "Untitled chat";
-  const lastActivity =
-    raw?.lastActivity ?? raw?.last_activity ?? raw?.lastMessageAt ?? raw?.last_message_at ?? null;
-
-  const summary = raw?.todaySummary ?? raw?.daily_summary ?? raw?.summary ?? null;
-  const summaryStatusRaw =
-    raw?.summaryStatus ?? raw?.summary_status ?? (summary ? "ready" : "none");
-  const summaryStatus: ChatRow["summaryStatus"] =
-    summaryStatusRaw === "ready" || summaryStatusRaw === "pending" || summaryStatusRaw === "none"
-      ? summaryStatusRaw
-      : summary
-        ? "ready"
-        : "none";
-
-  return {
-    id: String(raw?.id ?? raw?.chatId ?? raw?.chat_id ?? ""),
-    title,
-    lastActivity,
-    summaryStatus,
-    type: raw?.type,
-    members: raw?.members ?? raw?.memberCount ?? raw?.member_count,
-    messagesToday: raw?.messagesToday ?? raw?.messages_today,
-  };
-};
-
-const SummaryStatusBadge = ({ status }: { status: ChatRow["summaryStatus"] }) => {
-  if (status === "ready")
+const SummaryStatus = ({ summary }: { summary?: string | null }) => {
+  if (summary && summary.trim().length > 0) {
     return (
       <Badge variant="secondary" className="gap-1">
         <CheckCircle2 className="h-3 w-3 text-success" /> Today's summary ready
       </Badge>
     );
-  if (status === "pending")
-    return (
-      <Badge variant="secondary" className="gap-1">
-        <Clock className="h-3 w-3 text-muted-foreground" /> Pending
-      </Badge>
-    );
-  return <span className="text-muted-foreground text-xs">No summary yet</span>;
+  }
+  return (
+    <Badge variant="outline" className="gap-1 text-muted-foreground">
+      <Clock className="h-3 w-3" /> No summary yet
+    </Badge>
+  );
 };
 
 const Chats = () => {
   const [q, setQ] = useState("");
-  const [chats, setChats] = useState<ChatRow[]>([]);
+  const [chats, setChats] = useState<ApiChat[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -79,8 +51,8 @@ const Chats = () => {
         return;
       }
       const data = await res.json();
-      const list = Array.isArray(data) ? data : (data?.items ?? data?.chats ?? []);
-      setChats(list.map(normalize));
+      const list: ApiChat[] = Array.isArray(data) ? data : (data?.items ?? data?.chats ?? []);
+      setChats(list);
       if (showToast) toast.success("Chats refreshed");
     } catch {
       setChats([]);
@@ -101,7 +73,7 @@ const Chats = () => {
     setRefreshing(false);
   };
 
-  const list = chats.filter((c) => !q || c.title.toLowerCase().includes(q.toLowerCase()));
+  const list = chats.filter((c) => !q || (c.title ?? "").toLowerCase().includes(q.toLowerCase()));
 
   return (
     <div className="space-y-6 max-w-[1400px] mx-auto">
@@ -109,7 +81,7 @@ const Chats = () => {
         <div>
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Chats</h1>
           <p className="text-muted-foreground mt-1">
-            {loading ? "Loading…" : `${chats.length} connected Telegram chats`}
+            {loading ? "Loading…" : `${chats.length} connected Telegram chat${chats.length === 1 ? "" : "s"}`}
           </p>
         </div>
         <Button variant="outline" onClick={handleRefresh} disabled={refreshing || loading}>
@@ -121,7 +93,7 @@ const Chats = () => {
         <p className="text-sm text-muted-foreground">
           To connect a new chat, add <span className="font-mono font-semibold text-foreground">@Sumerz_bot</span> to your
           Telegram group and send <span className="font-mono font-semibold text-foreground">/connect [token]</span> in
-          the group. Your token is shown in onboarding and Settings. Then click Refresh to see the chat appear here.
+          the group. Your token is shown in onboarding and Settings. Then click Refresh.
         </p>
       </Card>
 
@@ -132,69 +104,53 @@ const Chats = () => {
         </div>
       </Card>
 
-      <Card className="overflow-hidden">
-        {loading ? (
-          <div className="p-6 space-y-3">
-            <Skeleton className="h-12 w-full" />
-            <Skeleton className="h-12 w-full" />
-            <Skeleton className="h-12 w-full" />
-          </div>
-        ) : chats.length === 0 ? (
-          <div className="py-16 text-center text-muted-foreground">
-            <Inbox className="h-10 w-10 mx-auto mb-3 opacity-40" />
-            <p className="text-sm">No chats connected yet.</p>
-            <p className="text-xs mt-1">Add @Sumerz_bot to a Telegram group and run /connect [token].</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-secondary/50 text-muted-foreground text-xs uppercase tracking-wider">
-                <tr>
-                  <th className="text-left font-medium px-4 py-3">Chat</th>
-                  <th className="text-left font-medium px-4 py-3">Last activity</th>
-                  <th className="text-left font-medium px-4 py-3">Today's summary</th>
-                </tr>
-              </thead>
-              <tbody>
-                {list.map((c) => (
-                  <tr key={c.id} className="border-t border-border hover:bg-secondary/30 transition">
-                    <td className="px-4 py-3">
-                      <Link to={`/app/chats/${c.id}`} className="flex items-center gap-3">
-                        <div className="h-9 w-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
-                          <Hash className="h-4 w-4" />
-                        </div>
-                        <div>
-                          <div className="font-medium">{c.title}</div>
-                          {c.members != null && (
-                            <div className="text-xs text-muted-foreground">{c.members} members</div>
-                          )}
-                        </div>
-                      </Link>
-                    </td>
-                    <td className="px-4 py-3">
-                      {c.lastActivity ? (
-                        <TimeAgo iso={c.lastActivity} />
-                      ) : (
-                        <span className="text-muted-foreground text-xs">—</span>
+      {loading ? (
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {[0, 1, 2].map((i) => <Skeleton key={i} className="h-40 w-full" />)}
+        </div>
+      ) : chats.length === 0 ? (
+        <Card className="py-16 text-center text-muted-foreground">
+          <Inbox className="h-10 w-10 mx-auto mb-3 opacity-40" />
+          <p className="text-sm">No chats connected yet.</p>
+          <p className="text-xs mt-1">Add @Sumerz_bot to a Telegram group and run /connect [token].</p>
+        </Card>
+      ) : list.length === 0 ? (
+        <Card className="py-12 text-center text-muted-foreground text-sm">No chats match your search.</Card>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {list.map((c) => (
+            <Link key={c.id} to={`/app/chats/${encodeURIComponent(c.id)}`} className="block">
+              <Card className="p-5 h-full hover:border-primary/40 hover:shadow-md transition">
+                <div className="flex items-start gap-3">
+                  <div className="h-10 w-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                    <Hash className="h-5 w-5" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <h3 className="font-semibold truncate">{c.title || "Untitled chat"}</h3>
+                      {c.chatType && (
+                        <Badge variant="secondary" className="capitalize shrink-0">{c.chatType.toLowerCase()}</Badge>
                       )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <SummaryStatusBadge status={c.summaryStatus} />
-                    </td>
-                  </tr>
-                ))}
-                {list.length === 0 && (
-                  <tr>
-                    <td colSpan={3} className="text-center py-12 text-muted-foreground">
-                      No chats match your search.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </Card>
+                    </div>
+                    <div className="mt-3 flex items-center gap-4 text-sm text-muted-foreground">
+                      <span className="flex items-center gap-1.5">
+                        <MessageSquare className="h-3.5 w-3.5" />
+                        <span className="font-medium text-foreground">{c.messageCount ?? 0}</span> messages
+                      </span>
+                      <span>
+                        {c.lastActivityAt ? <TimeAgo iso={c.lastActivityAt} /> : "No activity"}
+                      </span>
+                    </div>
+                    <div className="mt-4">
+                      <SummaryStatus summary={c.todaySummary} />
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            </Link>
+          ))}
+        </div>
+      )}
     </div>
   );
 };

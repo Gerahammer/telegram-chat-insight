@@ -36,11 +36,26 @@ const ChatDetail = () => {
           if (!cancelled) setNotFound(true);
           return;
         }
-        const json = (await res.json()) as ChatDetailResponse | Chat;
+        const json: any = await res.json();
+        // Backend may return the chat object directly or wrapped under `chat`.
+        const rawChat = json && typeof json === "object" && "chat" in json ? json.chat : json;
+        const chat: Chat | undefined = rawChat
+          ? {
+              ...rawChat,
+              // Map backend `title` -> UI `name` while keeping any existing name fallback.
+              name: rawChat.title ?? rawChat.name ?? "Untitled chat",
+              type: rawChat.chatType ?? rawChat.type,
+              messagesToday: rawChat.messageCount ?? rawChat.messagesToday,
+              lastActivity: rawChat.lastActivityAt ?? rawChat.lastActivity,
+            }
+          : undefined;
         const normalized: ChatDetailResponse =
           json && typeof json === "object" && "chat" in json
-            ? (json as ChatDetailResponse)
-            : { chat: json as Chat };
+            ? { ...(json as ChatDetailResponse), chat }
+            : {
+                chat,
+                summary: rawChat?.todaySummary ?? undefined,
+              };
         if (!cancelled) setData(normalized);
       } catch {
         if (!cancelled) setNotFound(true);
