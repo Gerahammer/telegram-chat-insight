@@ -22,8 +22,9 @@ interface ApiChat {
   todaySummary?: string | null;
 }
 
-const SummaryStatus = ({ summary }: { summary?: string | null }) => {
-  if (summary && summary.trim().length > 0) {
+const SummaryStatus = ({ summary }: { summary?: unknown }) => {
+  const text = typeof summary === "string" ? summary : "";
+  if (text.trim().length > 0) {
     return (
       <Badge variant="secondary" className="gap-1">
         <CheckCircle2 className="h-3 w-3 text-success" /> Today's summary ready
