@@ -32,19 +32,32 @@ const ChatDetail = () => {
     if (!id || generating) return;
     setGenerating(true);
     try {
-      const res = await apiFetch(`/api/chats/${encodeURIComponent(id)}/generate-summary`, {
-        method: "POST",
-      });
-      const body: any = await res.json().catch(() => null);
+      let res: Response;
+      try {
+        res = await apiFetch(`/api/chats/${encodeURIComponent(id)}/generate-summary`, {
+          method: "POST",
+        });
+      } catch {
+        toast.error("Network error — please try again");
+        return;
+      }
+
+      let body: any = null;
+      try {
+        const text = await res.text();
+        body = text ? JSON.parse(text) : null;
+      } catch {
+        body = null;
+      }
 
       if (!res.ok) {
         const msg: string = body?.message ?? body?.error ?? "";
         if (res.status === 429) {
-          toast.error(msg || "Please wait before generating another summary");
+          toast.error("Summary was recently generated. Please wait before generating again.");
         } else if (res.status === 400 && /no messages/i.test(msg)) {
           toast.error("No messages in the last 24 hours to summarize");
         } else {
-          toast.error(msg || "Failed to generate summary");
+          toast.error(msg || `Failed to generate summary (${res.status})`);
         }
         return;
       }
@@ -52,14 +65,17 @@ const ChatDetail = () => {
       const newSummary: string | undefined =
         body?.summary ?? body?.todaySummary ?? body?.text ?? undefined;
       const updatedAt: string | undefined = body?.summaryUpdatedAt ?? body?.updatedAt;
-      setData((prev) => ({
-        ...(prev ?? {}),
-        summary: newSummary ?? prev?.summary,
-        summaryUpdatedAt: updatedAt ?? prev?.summaryUpdatedAt,
-      }));
+      setData((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          summary: newSummary ?? prev.summary,
+          summaryUpdatedAt: updatedAt ?? prev.summaryUpdatedAt,
+        };
+      });
       toast.success("Summary generated");
-    } catch {
-      toast.error("Failed to generate summary");
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to generate summary");
     } finally {
       setGenerating(false);
     }
