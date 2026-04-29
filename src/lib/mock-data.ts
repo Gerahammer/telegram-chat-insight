@@ -4,7 +4,7 @@ export type Sentiment = "positive" | "neutral" | "negative";
 export type ChatType = "group" | "supergroup" | "channel";
 export type AttentionStatus = "needs_attention" | "no_activity" | "ok" | "urgent";
 export type ActionPriority = "low" | "medium" | "high";
-export type ActionStatus = "open" | "in_progress" | "resolved";
+export type ActionStatus = "open" | "in_progress" | "resolved" | "dismissed";
 
 export interface Chat {
   id: string;
