@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,9 @@ import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { ArrowLeft, ArrowRight, Building2, Bot, MessagesSquare, Check, Copy, LayoutDashboard } from "lucide-react";
 import { toast } from "sonner";
+import { apiFetch } from "@/lib/api";
+
+const BOT_USERNAME = "@Sumerz_bot";
 
 const steps = [
   { title: "Create workspace", icon: Building2 },
