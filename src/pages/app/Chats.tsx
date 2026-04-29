@@ -1,66 +1,107 @@
 import { Link } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { AttentionBadge, SentimentBadge, TimeAgo } from "@/components/Badges";
-import { Search, Plus, Hash, Inbox } from "lucide-react";
+import { TimeAgo } from "@/components/Badges";
+import { Search, Hash, Inbox, RefreshCw, CheckCircle2, Clock } from "lucide-react";
 import { apiFetch } from "@/lib/api";
-import type { Chat } from "@/lib/mock-data";
+import { toast } from "sonner";
 
-type Filter = "all" | "needs_attention" | "no_activity" | "active" | "positive" | "neutral" | "negative";
+interface ChatRow {
+  id: string;
+  title: string;
+  lastActivity: string | null;
+  summaryStatus: "ready" | "pending" | "none";
+  type?: string;
+  members?: number;
+  messagesToday?: number;
+}
 
-const filters: { id: Filter; label: string }[] = [
-  { id: "all", label: "All chats" },
-  { id: "needs_attention", label: "Needs attention" },
-  { id: "no_activity", label: "No activity" },
-  { id: "active", label: "Active today" },
-  { id: "positive", label: "Positive" },
-  { id: "neutral", label: "Neutral" },
-  { id: "negative", label: "Negative" },
-];
+// Normalize whatever the backend returns into a stable row shape.
+const normalize = (raw: any): ChatRow => {
+  const title =
+    raw?.title ?? raw?.name ?? raw?.chatTitle ?? raw?.chat_name ?? "Untitled chat";
+  const lastActivity =
+    raw?.lastActivity ?? raw?.last_activity ?? raw?.lastMessageAt ?? raw?.last_message_at ?? null;
 
-const matches = (c: Chat, f: Filter, q: string) => {
-  if (q && !c.name.toLowerCase().includes(q.toLowerCase())) return false;
-  if (f === "all") return true;
-  if (f === "needs_attention") return c.attention === "needs_attention" || c.attention === "urgent";
-  if (f === "no_activity") return c.attention === "no_activity";
-  if (f === "active") return (c.messagesToday ?? 0) > 0;
-  return c.sentiment === f;
+  const summary = raw?.todaySummary ?? raw?.daily_summary ?? raw?.summary ?? null;
+  const summaryStatusRaw =
+    raw?.summaryStatus ?? raw?.summary_status ?? (summary ? "ready" : "none");
+  const summaryStatus: ChatRow["summaryStatus"] =
+    summaryStatusRaw === "ready" || summaryStatusRaw === "pending" || summaryStatusRaw === "none"
+      ? summaryStatusRaw
+      : summary
+        ? "ready"
+        : "none";
+
+  return {
+    id: String(raw?.id ?? raw?.chatId ?? raw?.chat_id ?? ""),
+    title,
+    lastActivity,
+    summaryStatus,
+    type: raw?.type,
+    members: raw?.members ?? raw?.memberCount ?? raw?.member_count,
+    messagesToday: raw?.messagesToday ?? raw?.messages_today,
+  };
+};
+
+const SummaryStatusBadge = ({ status }: { status: ChatRow["summaryStatus"] }) => {
+  if (status === "ready")
+    return (
+      <Badge variant="secondary" className="gap-1">
+        <CheckCircle2 className="h-3 w-3 text-success" /> Today's summary ready
+      </Badge>
+    );
+  if (status === "pending")
+    return (
+      <Badge variant="secondary" className="gap-1">
+        <Clock className="h-3 w-3 text-muted-foreground" /> Pending
+      </Badge>
+    );
+  return <span className="text-muted-foreground text-xs">No summary yet</span>;
 };
 
 const Chats = () => {
-  const [filter, setFilter] = useState<Filter>("all");
   const [q, setQ] = useState("");
-  const [chats, setChats] = useState<Chat[]>([]);
+  const [chats, setChats] = useState<ChatRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await apiFetch("/api/chats");
-        if (!res.ok) {
-          if (!cancelled) setChats([]);
-          return;
-        }
-        const data = await res.json();
-        const list: Chat[] = Array.isArray(data) ? data : data?.items ?? [];
-        if (!cancelled) setChats(list);
-      } catch {
-        if (!cancelled) setChats([]);
-      } finally {
-        if (!cancelled) setLoading(false);
+  const fetchChats = useCallback(async (showToast = false) => {
+    try {
+      const res = await apiFetch("/api/chats");
+      if (!res.ok) {
+        setChats([]);
+        if (showToast) toast.error("Failed to load chats");
+        return;
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
+      const data = await res.json();
+      const list = Array.isArray(data) ? data : (data?.items ?? data?.chats ?? []);
+      setChats(list.map(normalize));
+      if (showToast) toast.success("Chats refreshed");
+    } catch {
+      setChats([]);
+      if (showToast) toast.error("Failed to load chats");
+    }
   }, []);
 
-  const list = chats.filter((c) => matches(c, filter, q));
+  useEffect(() => {
+    (async () => {
+      await fetchChats();
+      setLoading(false);
+    })();
+  }, [fetchChats]);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await fetchChats(true);
+    setRefreshing(false);
+  };
+
+  const list = chats.filter((c) => !q || c.title.toLowerCase().includes(q.toLowerCase()));
 
   return (
     <div className="space-y-6 max-w-[1400px] mx-auto">
@@ -71,22 +112,23 @@ const Chats = () => {
             {loading ? "Loading…" : `${chats.length} connected Telegram chats`}
           </p>
         </div>
-        <Button className="gradient-primary border-0"><Plus className="h-4 w-4 mr-2" /> Connect chat</Button>
+        <Button variant="outline" onClick={handleRefresh} disabled={refreshing || loading}>
+          <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? "animate-spin" : ""}`} /> Refresh
+        </Button>
       </div>
 
+      <Card className="p-4 border-dashed bg-secondary/30">
+        <p className="text-sm text-muted-foreground">
+          To connect a new chat, add <span className="font-mono font-semibold text-foreground">@Sumerz_bot</span> to your
+          Telegram group and send <span className="font-mono font-semibold text-foreground">/connect [token]</span> in
+          the group. Your token is shown in onboarding and Settings. Then click Refresh to see the chat appear here.
+        </p>
+      </Card>
+
       <Card className="p-4">
-        <div className="flex flex-col md:flex-row gap-3 md:items-center">
-          <div className="relative flex-1 max-w-sm">
-            <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search chats..." className="pl-9" />
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {filters.map((f) => (
-              <Button key={f.id} size="sm" variant={filter === f.id ? "default" : "outline"} onClick={() => setFilter(f.id)} className={filter === f.id ? "gradient-primary border-0" : ""}>
-                {f.label}
-              </Button>
-            ))}
-          </div>
+        <div className="relative max-w-sm">
+          <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search chats..." className="pl-9" />
         </div>
       </Card>
 
@@ -101,6 +143,7 @@ const Chats = () => {
           <div className="py-16 text-center text-muted-foreground">
             <Inbox className="h-10 w-10 mx-auto mb-3 opacity-40" />
             <p className="text-sm">No chats connected yet.</p>
+            <p className="text-xs mt-1">Add @Sumerz_bot to a Telegram group and run /connect [token].</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -108,11 +151,8 @@ const Chats = () => {
               <thead className="bg-secondary/50 text-muted-foreground text-xs uppercase tracking-wider">
                 <tr>
                   <th className="text-left font-medium px-4 py-3">Chat</th>
-                  <th className="text-left font-medium px-4 py-3">Type</th>
-                  <th className="text-left font-medium px-4 py-3">Today</th>
                   <th className="text-left font-medium px-4 py-3">Last activity</th>
-                  <th className="text-left font-medium px-4 py-3">Sentiment</th>
-                  <th className="text-left font-medium px-4 py-3">Status</th>
+                  <th className="text-left font-medium px-4 py-3">Today's summary</th>
                 </tr>
               </thead>
               <tbody>
@@ -120,24 +160,35 @@ const Chats = () => {
                   <tr key={c.id} className="border-t border-border hover:bg-secondary/30 transition">
                     <td className="px-4 py-3">
                       <Link to={`/app/chats/${c.id}`} className="flex items-center gap-3">
-                        <div className="h-9 w-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center"><Hash className="h-4 w-4" /></div>
+                        <div className="h-9 w-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+                          <Hash className="h-4 w-4" />
+                        </div>
                         <div>
-                          <div className="font-medium">{c.name}</div>
-                          <div className="text-xs text-muted-foreground">
-                            {c.members ?? 0} members{(c.unanswered ?? 0) > 0 ? ` · ${c.unanswered} unanswered` : ""}
-                          </div>
+                          <div className="font-medium">{c.title}</div>
+                          {c.members != null && (
+                            <div className="text-xs text-muted-foreground">{c.members} members</div>
+                          )}
                         </div>
                       </Link>
                     </td>
-                    <td className="px-4 py-3"><Badge variant="secondary" className="capitalize">{c.type ?? "group"}</Badge></td>
-                    <td className="px-4 py-3 font-medium">{c.messagesToday ?? 0}</td>
-                    <td className="px-4 py-3">{c.lastActivity ? <TimeAgo iso={c.lastActivity} /> : <span className="text-muted-foreground text-xs">—</span>}</td>
-                    <td className="px-4 py-3">{c.sentiment ? <SentimentBadge sentiment={c.sentiment} /> : <span className="text-muted-foreground text-xs">—</span>}</td>
-                    <td className="px-4 py-3">{c.attention ? <AttentionBadge status={c.attention} /> : <span className="text-muted-foreground text-xs">—</span>}</td>
+                    <td className="px-4 py-3">
+                      {c.lastActivity ? (
+                        <TimeAgo iso={c.lastActivity} />
+                      ) : (
+                        <span className="text-muted-foreground text-xs">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <SummaryStatusBadge status={c.summaryStatus} />
+                    </td>
                   </tr>
                 ))}
                 {list.length === 0 && (
-                  <tr><td colSpan={6} className="text-center py-12 text-muted-foreground">No chats match your filters.</td></tr>
+                  <tr>
+                    <td colSpan={3} className="text-center py-12 text-muted-foreground">
+                      No chats match your search.
+                    </td>
+                  </tr>
                 )}
               </tbody>
             </table>
