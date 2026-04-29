@@ -5,9 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AttentionBadge, SentimentBadge, PriorityBadge, StatusBadge, TimeAgo } from "@/components/Badges";
-import { ArrowLeft, Hash, MessageSquare, Users, Sparkles, AlertCircle, HelpCircle, Flag, Inbox } from "lucide-react";
+import { ArrowLeft, Hash, MessageSquare, Users, Sparkles, AlertCircle, HelpCircle, Flag, Inbox, Loader2, RefreshCw } from "lucide-react";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, LineChart, Line } from "recharts";
 import { apiFetch } from "@/lib/api";
+import { toast } from "sonner";
 import type { Chat, ActionItem, Message } from "@/lib/mock-data";
 
 interface ChatDetailResponse {
@@ -25,6 +26,44 @@ const ChatDetail = () => {
   const [data, setData] = useState<ChatDetailResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [generating, setGenerating] = useState(false);
+
+  const handleGenerateSummary = async () => {
+    if (!id || generating) return;
+    setGenerating(true);
+    try {
+      const res = await apiFetch(`/api/chats/${encodeURIComponent(id)}/generate-summary`, {
+        method: "POST",
+      });
+      const body: any = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        const msg: string = body?.message ?? body?.error ?? "";
+        if (res.status === 429) {
+          toast.error(msg || "Please wait before generating another summary");
+        } else if (res.status === 400 && /no messages/i.test(msg)) {
+          toast.error("No messages in the last 24 hours to summarize");
+        } else {
+          toast.error(msg || "Failed to generate summary");
+        }
+        return;
+      }
+
+      const newSummary: string | undefined =
+        body?.summary ?? body?.todaySummary ?? body?.text ?? undefined;
+      const updatedAt: string | undefined = body?.summaryUpdatedAt ?? body?.updatedAt;
+      setData((prev) => ({
+        ...(prev ?? {}),
+        summary: newSummary ?? prev?.summary,
+        summaryUpdatedAt: updatedAt ?? prev?.summaryUpdatedAt,
+      }));
+      toast.success("Summary generated");
+    } catch {
+      toast.error("Failed to generate summary");
+    } finally {
+      setGenerating(false);
+    }
+  };
 
   useEffect(() => {
     if (!id) return;
@@ -167,14 +206,36 @@ const ChatDetail = () => {
       <Card className="p-6 bg-gradient-to-br from-primary/5 to-primary-glow/5 border-primary/20">
         <div className="flex items-start gap-3">
           <div className="h-9 w-9 rounded-lg gradient-primary flex items-center justify-center shrink-0"><Sparkles className="h-4 w-4 text-primary-foreground" /></div>
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <h2 className="font-semibold">Today's AI summary</h2>
-              {data.summaryUpdatedAt && <Badge variant="outline" className="text-xs">{data.summaryUpdatedAt}</Badge>}
+          <div className="flex-1 min-w-0">
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
+              <div className="flex items-center gap-2">
+                <h2 className="font-semibold">Today's AI summary</h2>
+                {data.summaryUpdatedAt && <Badge variant="outline" className="text-xs">{data.summaryUpdatedAt}</Badge>}
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleGenerateSummary}
+                disabled={generating}
+              >
+                {generating ? (
+                  <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-3.5 w-3.5 mr-2" />
+                )}
+                {generating ? "Generating..." : "Generate summary now"}
+              </Button>
             </div>
-            <p className="text-sm leading-relaxed text-foreground/90">
-              {data.summary ?? "No summary available for this chat yet."}
-            </p>
+            {generating ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>Generating AI summary...</span>
+              </div>
+            ) : (
+              <p className="text-sm leading-relaxed text-foreground/90">
+                {data.summary ?? "No summary available for this chat yet."}
+              </p>
+            )}
           </div>
         </div>
       </Card>
