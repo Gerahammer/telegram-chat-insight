@@ -17,24 +17,23 @@ const WorkspaceStatsContext = createContext<WorkspaceStats>({
   refresh: async () => {},
 });
 
-function arrayLen(data: unknown): number {
-  if (Array.isArray(data)) return data.length;
+function extractArray(data: unknown): unknown[] {
+  if (Array.isArray(data)) return data;
   if (data && typeof data === "object") {
-    const o = data as { items?: unknown[]; total?: number; count?: number };
-    if (typeof o.total === "number") return o.total;
-    if (typeof o.count === "number") return o.count;
-    if (Array.isArray(o.items)) return o.items.length;
+    const o = data as Record<string, unknown>;
+    // Our API returns { chats: [...] } or { actionItems: [...] } or { items: [...] }
+    if (Array.isArray(o.chats)) return o.chats;
+    if (Array.isArray(o.actionItems)) return o.actionItems;
+    if (Array.isArray(o.items)) return o.items;
+    if (typeof o.total === "number") return new Array(o.total);
+    if (typeof o.count === "number") return new Array(o.count);
   }
-  return 0;
+  return [];
 }
 
 async function safeJson(res: Response | null): Promise<unknown | null> {
   if (!res || !res.ok) return null;
-  try {
-    return await res.json();
-  } catch {
-    return null;
-  }
+  try { return await res.json(); } catch { return null; }
 }
 
 export function WorkspaceStatsProvider({ children }: { children: ReactNode }) {
@@ -53,18 +52,17 @@ export function WorkspaceStatsProvider({ children }: { children: ReactNode }) {
     const chats = await safeJson(chatsRes);
     const actions = await safeJson(actionsRes);
     const overview = (await safeJson(overviewRes)) as
-      | { chatsWithNoActivity?: number; noActivity?: number }
+      | { chatsWithNoActivity?: number; openActionItems?: number }
       | null;
 
-    setChatsCount(chats === null ? 0 : arrayLen(chats));
-    setOpenActionsCount(actions === null ? 0 : arrayLen(actions));
-    setNoActivityCount(overview?.chatsWithNoActivity ?? overview?.noActivity ?? 0);
+    setChatsCount(extractArray(chats).length);
+    // Prefer the accurate count from overview if available
+    setOpenActionsCount(overview?.openActionItems ?? extractArray(actions).length);
+    setNoActivityCount(overview?.chatsWithNoActivity ?? 0);
     setLoading(false);
   };
 
-  useEffect(() => {
-    void refresh();
-  }, []);
+  useEffect(() => { void refresh(); }, []);
 
   return (
     <WorkspaceStatsContext.Provider
