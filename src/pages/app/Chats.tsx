@@ -153,6 +153,12 @@ const Chats = () => {
           ))}
         </div>
       )}
+
+      <ConnectChatDialog
+        open={connectOpen}
+        onOpenChange={setConnectOpen}
+        onDone={() => fetchChats(true)}
+      />
     </div>
   );
 };
