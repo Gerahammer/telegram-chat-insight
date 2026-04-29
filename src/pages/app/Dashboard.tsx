@@ -32,11 +32,17 @@ import { apiFetch } from "@/lib/api";
 import type { AttentionStatus } from "@/lib/mock-data";
 
 interface OverviewStats {
+  totalConnectedChats?: number;
   connectedChats?: number;
+  chatsNeedingAttention?: number;
   needAttention?: number;
+  chatsWithNoActivity?: number;
   noActivity?: number;
+  openActionItems?: number;
   openActions?: number;
+  totalMessagesToday?: number;
   messagesToday?: number;
+  averageSentiment?: number | string;
   avgSentiment?: number | string;
   messageVolume?: { day: string; messages: number }[];
   activityBreakdown?: { name: string; value: number; color?: string }[];
