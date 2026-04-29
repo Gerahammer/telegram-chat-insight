@@ -17,6 +17,8 @@ export interface Chat {
   sentiment: Sentiment;
   connected: boolean;
   unanswered: number;
+  isActive?: boolean;
+  todaySummary?: string;
 }
 
 export interface ActionItem {
