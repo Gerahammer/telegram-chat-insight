@@ -26,6 +26,44 @@ const ChatDetail = () => {
   const [data, setData] = useState<ChatDetailResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [generating, setGenerating] = useState(false);
+
+  const handleGenerateSummary = async () => {
+    if (!id || generating) return;
+    setGenerating(true);
+    try {
+      const res = await apiFetch(`/api/chats/${encodeURIComponent(id)}/generate-summary`, {
+        method: "POST",
+      });
+      const body: any = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        const msg: string = body?.message ?? body?.error ?? "";
+        if (res.status === 429) {
+          toast.error(msg || "Please wait before generating another summary");
+        } else if (res.status === 400 && /no messages/i.test(msg)) {
+          toast.error("No messages in the last 24 hours to summarize");
+        } else {
+          toast.error(msg || "Failed to generate summary");
+        }
+        return;
+      }
+
+      const newSummary: string | undefined =
+        body?.summary ?? body?.todaySummary ?? body?.text ?? undefined;
+      const updatedAt: string | undefined = body?.summaryUpdatedAt ?? body?.updatedAt;
+      setData((prev) => ({
+        ...(prev ?? {}),
+        summary: newSummary ?? prev?.summary,
+        summaryUpdatedAt: updatedAt ?? prev?.summaryUpdatedAt,
+      }));
+      toast.success("Summary generated");
+    } catch {
+      toast.error("Failed to generate summary");
+    } finally {
+      setGenerating(false);
+    }
+  };
 
   useEffect(() => {
     if (!id) return;
