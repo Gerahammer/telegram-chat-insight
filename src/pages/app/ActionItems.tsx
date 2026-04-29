@@ -1,20 +1,57 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PriorityBadge, StatusBadge, TimeAgo } from "@/components/Badges";
 import { Search, ListTodo } from "lucide-react";
-import { actionItems, chats } from "@/lib/mock-data";
+import { apiFetch } from "@/lib/api";
+import type { ActionItem, Chat } from "@/lib/mock-data";
 
 const ActionItems = () => {
   const [priority, setPriority] = useState("all");
   const [status, setStatus] = useState("all");
   const [chat, setChat] = useState("all");
   const [q, setQ] = useState("");
+  const [items, setItems] = useState<ActionItem[]>([]);
+  const [chats, setChats] = useState<Chat[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const list = actionItems.filter((a) => {
-    if (q && !a.title.toLowerCase().includes(q.toLowerCase())) return false;
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const [itemsRes, chatsRes] = await Promise.all([
+        apiFetch("/api/action-items").catch(() => null),
+        apiFetch("/api/chats").catch(() => null),
+      ]);
+      let itemsList: ActionItem[] = [];
+      let chatsList: Chat[] = [];
+      if (itemsRes?.ok) {
+        try {
+          const data = await itemsRes.json();
+          itemsList = Array.isArray(data) ? data : data?.items ?? [];
+        } catch { /* empty */ }
+      }
+      if (chatsRes?.ok) {
+        try {
+          const data = await chatsRes.json();
+          chatsList = Array.isArray(data) ? data : data?.items ?? [];
+        } catch { /* empty */ }
+      }
+      if (!cancelled) {
+        setItems(itemsList);
+        setChats(chatsList);
+        setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const list = items.filter((a) => {
+    if (q && !a.title?.toLowerCase().includes(q.toLowerCase())) return false;
     if (priority !== "all" && a.priority !== priority) return false;
     if (status !== "all" && a.status !== status) return false;
     if (chat !== "all" && a.chatId !== chat) return false;
@@ -63,35 +100,41 @@ const ActionItems = () => {
       </Card>
 
       <div className="space-y-3">
-        {list.length === 0 && (
+        {loading ? (
+          <>
+            <Skeleton className="h-24 w-full" />
+            <Skeleton className="h-24 w-full" />
+          </>
+        ) : list.length === 0 ? (
           <Card className="p-12 text-center text-muted-foreground">
             <ListTodo className="h-10 w-10 mx-auto mb-3 opacity-40" />
-            No action items match your filters.
+            {items.length === 0 ? "No action items yet." : "No action items match your filters."}
           </Card>
+        ) : (
+          list.map((a) => (
+            <Card key={a.id} className="p-5 hover:shadow-md transition">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="font-semibold">{a.title}</h3>
+                    {a.priority && <PriorityBadge priority={a.priority} />}
+                    {a.status && <StatusBadge status={a.status} />}
+                  </div>
+                  {a.description && <p className="text-sm text-muted-foreground mt-1.5">{a.description}</p>}
+                  <div className="flex items-center gap-3 mt-3 text-xs text-muted-foreground">
+                    {a.chatName && <span>📁 {a.chatName}</span>}
+                    {a.requestedBy && <span>👤 {a.requestedBy}</span>}
+                    {a.createdAt && <TimeAgo iso={a.createdAt} />}
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm">Mark in progress</Button>
+                  <Button size="sm" className="gradient-primary border-0">Resolve</Button>
+                </div>
+              </div>
+            </Card>
+          ))
         )}
-        {list.map((a) => (
-          <Card key={a.id} className="p-5 hover:shadow-md transition">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h3 className="font-semibold">{a.title}</h3>
-                  <PriorityBadge priority={a.priority} />
-                  <StatusBadge status={a.status} />
-                </div>
-                <p className="text-sm text-muted-foreground mt-1.5">{a.description}</p>
-                <div className="flex items-center gap-3 mt-3 text-xs text-muted-foreground">
-                  <span>📁 {a.chatName}</span>
-                  <span>👤 {a.requestedBy}</span>
-                  <TimeAgo iso={a.createdAt} />
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm">Mark in progress</Button>
-                <Button size="sm" className="gradient-primary border-0">Resolve</Button>
-              </div>
-            </div>
-          </Card>
-        ))}
       </div>
     </div>
   );
