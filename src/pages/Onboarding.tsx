@@ -21,7 +21,29 @@ const steps = [
 
 const Onboarding = () => {
   const [step, setStep] = useState(0);
+  const [connectionToken, setConnectionToken] = useState<string | null>(null);
+  const [tokenLoading, setTokenLoading] = useState(false);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    let cancelled = false;
+    setTokenLoading(true);
+    apiFetch("/api/workspaces/current/connection-token")
+      .then(async (res) => {
+        if (!res.ok) throw new Error(`Request failed: ${res.status}`);
+        const data = await res.json();
+        if (!cancelled) setConnectionToken(data.connectionToken ?? null);
+      })
+      .catch(() => {
+        if (!cancelled) setConnectionToken(null);
+      })
+      .finally(() => {
+        if (!cancelled) setTokenLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const next = () => (step < 3 ? setStep(step + 1) : navigate("/app"));
   const back = () => setStep(Math.max(0, step - 1));
