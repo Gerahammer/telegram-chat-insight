@@ -42,6 +42,7 @@ const Chats = () => {
   const [chats, setChats] = useState<ApiChat[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [connectOpen, setConnectOpen] = useState(false);
 
   const fetchChats = useCallback(async (showToast = false) => {
     try {
