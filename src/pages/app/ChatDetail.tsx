@@ -206,14 +206,36 @@ const ChatDetail = () => {
       <Card className="p-6 bg-gradient-to-br from-primary/5 to-primary-glow/5 border-primary/20">
         <div className="flex items-start gap-3">
           <div className="h-9 w-9 rounded-lg gradient-primary flex items-center justify-center shrink-0"><Sparkles className="h-4 w-4 text-primary-foreground" /></div>
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <h2 className="font-semibold">Today's AI summary</h2>
-              {data.summaryUpdatedAt && <Badge variant="outline" className="text-xs">{data.summaryUpdatedAt}</Badge>}
+          <div className="flex-1 min-w-0">
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
+              <div className="flex items-center gap-2">
+                <h2 className="font-semibold">Today's AI summary</h2>
+                {data.summaryUpdatedAt && <Badge variant="outline" className="text-xs">{data.summaryUpdatedAt}</Badge>}
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleGenerateSummary}
+                disabled={generating}
+              >
+                {generating ? (
+                  <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-3.5 w-3.5 mr-2" />
+                )}
+                {generating ? "Generating..." : "Generate summary now"}
+              </Button>
             </div>
-            <p className="text-sm leading-relaxed text-foreground/90">
-              {data.summary ?? "No summary available for this chat yet."}
-            </p>
+            {generating ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>Generating AI summary...</span>
+              </div>
+            ) : (
+              <p className="text-sm leading-relaxed text-foreground/90">
+                {data.summary ?? "No summary available for this chat yet."}
+              </p>
+            )}
           </div>
         </div>
       </Card>
