@@ -192,7 +192,7 @@ const Chats = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [connectOpen, setConnectOpen] = useState(false);
-  const [view, setView] = useState<"grid" | "list">("list");
+  const [view, setView] = useState<"grid" | "list">((localStorage.getItem("chatView") as "grid" | "list") ?? "list");
 
   const fetchChats = useCallback(async (showToast = false) => {
     try {
@@ -233,14 +233,14 @@ const Chats = () => {
           {/* View toggle */}
           <div className="flex items-center border rounded-lg overflow-hidden">
             <button
-              onClick={() => setView("list")}
+              onClick={() => { setView("list"); localStorage.setItem("chatView", "list"); }}
               className={`px-3 py-2 transition ${view === "list" ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
               title="List view"
             >
               <List className="h-4 w-4" />
             </button>
             <button
-              onClick={() => setView("grid")}
+              onClick={() => { setView("grid"); localStorage.setItem("chatView", "grid"); }}
               className={`px-3 py-2 transition ${view === "grid" ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
               title="Grid view"
             >
