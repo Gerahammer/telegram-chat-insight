@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,11 +7,58 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Bot, Copy, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { apiFetch } from "@/lib/api";
+
+interface Member { id?: string; name?: string; email?: string; role?: string; }
+interface MeResponse {
+  name?: string; fullName?: string; email?: string;
+  workspace?: { name?: string; slug?: string; timezone?: string };
+  workspaceName?: string;
+}
 
 const Settings = () => {
+  const [me, setMe] = useState<MeResponse | null>(null);
+  const [members, setMembers] = useState<Member[]>([]);
+  const [token, setToken] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const [meRes, membersRes, tokenRes] = await Promise.all([
+        apiFetch("/api/auth/me").catch(() => null),
+        apiFetch("/api/workspaces/current/members").catch(() => null),
+        apiFetch("/api/workspaces/current/connection-token").catch(() => null),
+      ]);
+      if (meRes?.ok) {
+        try { if (!cancelled) setMe(await meRes.json()); } catch { /* empty */ }
+      }
+      if (membersRes?.ok) {
+        try {
+          const data = await membersRes.json();
+          const list: Member[] = Array.isArray(data) ? data : data?.items ?? [];
+          if (!cancelled) setMembers(list);
+        } catch { /* empty */ }
+      }
+      if (tokenRes?.ok) {
+        try {
+          const data = await tokenRes.json();
+          if (!cancelled) setToken(data?.connectionToken ?? data?.token ?? null);
+        } catch { /* empty */ }
+      }
+      if (!cancelled) setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const workspaceName = me?.workspace?.name ?? me?.workspaceName ?? "";
+  const workspaceSlug = me?.workspace?.slug ?? "";
+  const workspaceTz = me?.workspace?.timezone ?? "utc";
+
   return (
     <div className="space-y-6 max-w-[1100px] mx-auto">
       <div>
@@ -30,19 +78,29 @@ const Settings = () => {
 
         <TabsContent value="workspace" className="mt-6">
           <Card className="p-6 space-y-4 max-w-xl">
-            <div className="space-y-2"><Label>Workspace name</Label><Input defaultValue="Acme Affiliates" /></div>
-            <div className="space-y-2"><Label>Workspace URL</Label><Input defaultValue="acme" /></div>
-            <div className="space-y-2"><Label>Time zone</Label>
-              <Select defaultValue="utc">
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="utc">UTC</SelectItem>
-                  <SelectItem value="cet">CET (Europe/Berlin)</SelectItem>
-                  <SelectItem value="est">EST (America/New_York)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <Button className="gradient-primary border-0">Save changes</Button>
+            {loading ? (
+              <>
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+              </>
+            ) : (
+              <>
+                <div className="space-y-2"><Label>Workspace name</Label><Input defaultValue={workspaceName} /></div>
+                <div className="space-y-2"><Label>Workspace URL</Label><Input defaultValue={workspaceSlug} /></div>
+                <div className="space-y-2"><Label>Time zone</Label>
+                  <Select defaultValue={workspaceTz}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="utc">UTC</SelectItem>
+                      <SelectItem value="cet">CET (Europe/Berlin)</SelectItem>
+                      <SelectItem value="est">EST (America/New_York)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button className="gradient-primary border-0">Save changes</Button>
+              </>
+            )}
           </Card>
         </TabsContent>
 
@@ -53,25 +111,36 @@ const Settings = () => {
               <Button size="sm" className="gradient-primary border-0"><Plus className="h-3 w-3 mr-2" /> Invite</Button>
             </div>
             <div className="space-y-2">
-              {[
-                { name: "Jordan Davis", email: "jordan@acme.io", role: "Owner" },
-                { name: "Maria Schmidt", email: "maria@acme.io", role: "Admin" },
-                { name: "Lukas Petrov", email: "lukas@acme.io", role: "Member" },
-              ].map((m) => (
-                <div key={m.email} className="flex items-center justify-between p-3 border border-border rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <Avatar className="h-9 w-9"><AvatarFallback className="text-xs">{m.name.split(" ").map((s) => s[0]).join("")}</AvatarFallback></Avatar>
-                    <div>
-                      <div className="font-medium text-sm">{m.name}</div>
-                      <div className="text-xs text-muted-foreground">{m.email}</div>
+              {loading ? (
+                <>
+                  <Skeleton className="h-14 w-full" />
+                  <Skeleton className="h-14 w-full" />
+                </>
+              ) : members.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-6 text-center">No team members yet.</p>
+              ) : (
+                members.map((m) => {
+                  const name = m.name ?? m.email ?? "Member";
+                  const initials = name.split(/\s+/).map((s) => s[0]).join("").slice(0, 2).toUpperCase();
+                  return (
+                    <div key={m.id ?? m.email ?? name} className="flex items-center justify-between p-3 border border-border rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <Avatar className="h-9 w-9"><AvatarFallback className="text-xs">{initials}</AvatarFallback></Avatar>
+                        <div>
+                          <div className="font-medium text-sm">{name}</div>
+                          {m.email && <div className="text-xs text-muted-foreground">{m.email}</div>}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {m.role && <Badge variant="secondary">{m.role}</Badge>}
+                        {m.role && m.role.toLowerCase() !== "owner" && (
+                          <Button variant="ghost" size="icon"><Trash2 className="h-4 w-4 text-muted-foreground" /></Button>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="secondary">{m.role}</Badge>
-                    {m.role !== "Owner" && <Button variant="ghost" size="icon"><Trash2 className="h-4 w-4 text-muted-foreground" /></Button>}
-                  </div>
-                </div>
-              ))}
+                  );
+                })
+              )}
             </div>
           </Card>
         </TabsContent>
@@ -82,14 +151,14 @@ const Settings = () => {
               <div className="h-10 w-10 rounded-lg gradient-primary flex items-center justify-center"><Bot className="h-5 w-5 text-primary-foreground" /></div>
               <div>
                 <h2 className="font-semibold">Telegram bot connection</h2>
-                <p className="text-sm text-muted-foreground">Add @ReplyRadarBot to any group to start monitoring.</p>
+                <p className="text-sm text-muted-foreground">Add @Sumerz_bot to any group to start monitoring.</p>
               </div>
             </div>
             <ol className="space-y-3 text-sm">
               {[
-                "Add @ReplyRadarBot to your Telegram group",
+                "Add @Sumerz_bot to your Telegram group",
                 "Make the bot an admin",
-                "Send /connect in the group",
+                "Send /connect [token] in the group",
                 "Return to the dashboard to confirm the connection",
               ].map((s, i) => (
                 <li key={s} className="flex gap-3 items-start">
@@ -100,10 +169,23 @@ const Settings = () => {
             </ol>
             <div className="mt-6 p-4 rounded-lg border border-primary/20 bg-primary/5 flex items-center justify-between">
               <div>
-                <div className="text-xs text-muted-foreground">Workspace auth code</div>
-                <div className="font-mono text-lg font-bold">ACME-7421</div>
+                <div className="text-xs text-muted-foreground">Workspace connection token</div>
+                <div className="font-mono text-lg font-bold">
+                  {loading ? <Skeleton className="h-6 w-32" /> : token ?? "Unavailable"}
+                </div>
               </div>
-              <Button variant="outline" size="sm" onClick={() => { navigator.clipboard.writeText("ACME-7421"); toast.success("Copied!"); }}><Copy className="h-3 w-3 mr-2" />Copy</Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={!token}
+                onClick={() => {
+                  if (!token) return;
+                  navigator.clipboard.writeText(token);
+                  toast.success("Copied!");
+                }}
+              >
+                <Copy className="h-3 w-3 mr-2" />Copy
+              </Button>
             </div>
           </Card>
         </TabsContent>
