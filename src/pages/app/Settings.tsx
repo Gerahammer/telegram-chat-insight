@@ -129,7 +129,6 @@ const Settings = () => {
         <TabsList className="grid w-full grid-cols-3 lg:grid-cols-5 h-auto">
           <TabsTrigger value="workspace">Workspace</TabsTrigger>
           <TabsTrigger value="team">Team</TabsTrigger>
-          <TabsTrigger value="bot">Bot</TabsTrigger>
           <TabsTrigger value="ai">AI summaries</TabsTrigger>
           <TabsTrigger value="data">Data</TabsTrigger>
         </TabsList>
@@ -195,50 +194,6 @@ const Settings = () => {
                   );
                 })
               )}
-            </div>
-          </Card>
-        </TabsContent>
-
-        {/* Bot */}
-        <TabsContent value="bot" className="mt-6">
-          <Card className="p-6 max-w-2xl">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="h-10 w-10 rounded-lg gradient-primary flex items-center justify-center">
-                <Bot className="h-5 w-5 text-primary-foreground" />
-              </div>
-              <div>
-                <h2 className="font-semibold">Telegram bot connection</h2>
-                <p className="text-sm text-muted-foreground">Add @Sumerz_bot to any group to start monitoring.</p>
-              </div>
-            </div>
-            <ol className="space-y-3 text-sm mb-6">
-              {[
-                "Add @Sumerz_bot to your Telegram group (no admin needed)",
-                "Copy your connection token below",
-                "Send /connect [token] in the group — bot deletes it instantly",
-                "Click refresh on the Chats page to see the new group",
-              ].map((s, i) => (
-                <li key={i} className="flex gap-3 items-start">
-                  <div className="h-6 w-6 rounded-full bg-primary/10 text-primary text-xs font-semibold flex items-center justify-center shrink-0">{i + 1}</div>
-                  <span>{s}</span>
-                </li>
-              ))}
-            </ol>
-            <div className="p-4 rounded-lg border border-primary/20 bg-primary/5">
-              <div className="text-xs text-muted-foreground mb-1">Connection token (one-time use)</div>
-              <div className="flex items-center justify-between gap-3">
-                <div className="font-mono text-lg font-bold">
-                  {loading ? <Skeleton className="h-6 w-32 inline-block" /> : token ?? "Unavailable"}
-                </div>
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm" disabled={!token} onClick={() => { if (token) { navigator.clipboard.writeText(`/connect ${token}`); toast.success("Command copied!"); } }}>
-                    <Copy className="h-3 w-3 mr-2" /> Copy command
-                  </Button>
-                  <Button variant="outline" size="sm" disabled={refreshingToken} onClick={handleRefreshToken}>
-                    <RefreshCw className={`h-3 w-3 mr-2 ${refreshingToken ? "animate-spin" : ""}`} /> New token
-                  </Button>
-                </div>
-              </div>
             </div>
           </Card>
         </TabsContent>
