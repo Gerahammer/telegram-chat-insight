@@ -43,7 +43,7 @@ export default function CalendarPage() {
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth());
-  const [selectedDay, setSelectedDay] = useState<number | null>(now.getDate());
+  const [selectedDate, setSelectedDate] = useState<string | null>(now.toISOString().slice(0, 10));
 
   useEffect(() => {
     (async () => {
@@ -125,11 +125,7 @@ export default function CalendarPage() {
     return events.filter(e => e.date === dateStr);
   };
 
-  const selectedDateStr = selectedDay
-    ? `${year}-${String(month + 1).padStart(2, "0")}-${String(selectedDay).padStart(2, "0")}`
-    : null;
-
-  const selectedEvents = selectedDay ? getEventsForDay(selectedDay) : [];
+  const selectedEvents = selectedDate ? events.filter(e => e.date === selectedDate) : [];
 
   // Upcoming events (next 7 days)
   const upcoming = events
@@ -152,7 +148,7 @@ export default function CalendarPage() {
             <h2 className="text-lg font-semibold">{MONTHS[month]} {year}</h2>
             <div className="flex gap-2">
               <Button variant="outline" size="sm" onClick={prevMonth}><ChevronLeft className="h-4 w-4" /></Button>
-              <Button variant="outline" size="sm" onClick={() => { setYear(now.getFullYear()); setMonth(now.getMonth()); setSelectedDay(now.getDate()); }}>Today</Button>
+              <Button variant="outline" size="sm" onClick={() => { setYear(now.getFullYear()); setMonth(now.getMonth()); setSelectedDate(now.toISOString().slice(0, 10)); }}>Today</Button>
               <Button variant="outline" size="sm" onClick={nextMonth}><ChevronRight className="h-4 w-4" /></Button>
             </div>
           </div>
@@ -182,13 +178,13 @@ export default function CalendarPage() {
                 const dayEvents = getEventsForDay(day, yOffset, mOffset);
                 const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
                 const isToday = dateStr === todayStr;
-                const isSelected = day === selectedDay;
+                const isSelected = dateStr === selectedDate;
                 const isPast = dateStr < todayStr;
 
                 return (
                   <button
                     key={day}
-                    onClick={() => setSelectedDay(day === selectedDay ? null : day)}
+                    onClick={() => setSelectedDate(dateStr === selectedDate ? null : dateStr)}
                     className={`
                       relative min-h-[60px] p-1.5 rounded-lg border text-left transition
                       ${isSelected ? "border-primary bg-primary/10" : "border-transparent hover:border-border hover:bg-muted/50"}
@@ -223,10 +219,10 @@ export default function CalendarPage() {
           </div>
 
           {/* Selected day events */}
-          {selectedDay && (
+          {selectedDate && (
             <div className="mt-6 border-t pt-4">
               <h3 className="font-semibold mb-3 text-sm">
-                {new Date(selectedDateStr!).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" })}
+                {new Date(selectedDate!).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" })}
                 {" · "}{selectedEvents.length} event{selectedEvents.length !== 1 ? "s" : ""}
               </h3>
               {selectedEvents.length === 0 ? (
