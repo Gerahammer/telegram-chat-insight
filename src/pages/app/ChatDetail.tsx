@@ -439,7 +439,16 @@ const ChatDetail = () => {
                   </div>
                 ) : (
                   <>
-                    <p className="text-sm leading-relaxed">{summaries[0].noActivity ? "No messages on this day." : (summaries[0].summaryText ?? "")}</p>
+                    <div className="text-sm leading-relaxed space-y-1">
+                      {summaries[0].noActivity ? "No messages on this day." :
+                        (summaries[0].summaryText ?? "").split("•").filter(Boolean).map((point, i) => (
+                          <div key={i} className="flex gap-2">
+                            <span className="text-primary shrink-0">•</span>
+                            <span>{point.trim()}</span>
+                          </div>
+                        ))
+                      }
+                    </div>
                     <div className="flex flex-wrap gap-2 mt-3">
                       {summaries[0].sentiment && <SentimentBadge sentiment={summaries[0].sentiment as any} />}
                       {summaries[0].requiresAttention && <Badge variant="outline" className="text-warning border-warning/30 bg-warning/10 text-xs">Needs attention</Badge>}
