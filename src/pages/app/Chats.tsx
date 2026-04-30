@@ -95,7 +95,7 @@ const ChatCard = ({ c }: { c: ApiChat }) => {
     <Link to={`/app/chats/${encodeURIComponent(c.id)}`} className="block">
       <Card className="p-5 h-full hover:border-primary/40 hover:shadow-md transition">
         <div className="flex items-start gap-3">
-          {c.photoUrl ? <img src={`https://seahorse-app-47666.ondigitalocean.app/api/proxy/image?url=${encodeURIComponent(c.photoUrl)}`} alt={c.title} className="h-10 w-10 rounded-lg object-cover shrink-0" /> : <div className="h-10 w-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+          {c.photoUrl ? <img src={`${import.meta.env.VITE_API_URL || "https://seahorse-app-47666.ondigitalocean.app"}/api/proxy/image?url=${encodeURIComponent(c.photoUrl)}`} alt={c.title} className="h-10 w-10 rounded-lg object-cover shrink-0" /> : <div className="h-10 w-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
             <Hash className="h-5 w-5" />
           </div>}
           <div className="min-w-0 flex-1">
@@ -144,7 +144,7 @@ const ChatRow = ({ c }: { c: ApiChat }) => {
   return (
     <Link to={`/app/chats/${encodeURIComponent(c.id)}`} className="block">
       <div className="flex items-center gap-4 p-4 rounded-lg border border-border hover:border-primary/40 hover:bg-secondary/30 transition">
-        {c.photoUrl ? <img src={`https://seahorse-app-47666.ondigitalocean.app/api/proxy/image?url=${encodeURIComponent(c.photoUrl)}`} alt={c.title} className="h-9 w-9 rounded-lg object-cover shrink-0" /> : <div className="h-9 w-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0"><Hash className="h-4 w-4" /></div>}
+        {c.photoUrl ? <img src={`${import.meta.env.VITE_API_URL || "https://seahorse-app-47666.ondigitalocean.app"}/api/proxy/image?url=${encodeURIComponent(c.photoUrl)}`} alt={c.title} className="h-9 w-9 rounded-lg object-cover shrink-0" /> : <div className="h-9 w-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0"><Hash className="h-4 w-4" /></div>}
           <Hash className="h-4 w-4" />
         {/* Title */}
         <div className="min-w-0 flex-1">

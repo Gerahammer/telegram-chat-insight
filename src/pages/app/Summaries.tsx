@@ -75,7 +75,7 @@ const Summaries = () => {
                     <div className="flex items-center gap-3">
                       {c.photoUrl ? (
                         <img
-                          src={`https://seahorse-app-47666.ondigitalocean.app/api/proxy/image?url=${encodeURIComponent(c.photoUrl)}`}
+                          src={`${import.meta.env.VITE_API_URL || "https://seahorse-app-47666.ondigitalocean.app"}/api/proxy/image?url=${encodeURIComponent(c.photoUrl)}`}
                           alt={c.title}
                           className="h-9 w-9 rounded-lg object-cover shrink-0"
                         />
@@ -125,7 +125,7 @@ const Summaries = () => {
                       <div className="flex items-center gap-3">
                         {c.photoUrl ? (
                           <img
-                            src={`https://seahorse-app-47666.ondigitalocean.app/api/proxy/image?url=${encodeURIComponent(c.photoUrl)}`}
+                            src={`${import.meta.env.VITE_API_URL || "https://seahorse-app-47666.ondigitalocean.app"}/api/proxy/image?url=${encodeURIComponent(c.photoUrl)}`}
                             alt={c.title}
                             className="h-8 w-8 rounded-lg object-cover"
                           />

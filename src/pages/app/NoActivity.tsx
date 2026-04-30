@@ -84,7 +84,7 @@ const NoActivity = () => {
               <div className="flex items-start gap-3">
                 {c.photoUrl ? (
                   <img
-                    src={`https://seahorse-app-47666.ondigitalocean.app/api/proxy/image?url=${encodeURIComponent(c.photoUrl)}`}
+                    src={`${import.meta.env.VITE_API_URL || "https://seahorse-app-47666.ondigitalocean.app"}/api/proxy/image?url=${encodeURIComponent(c.photoUrl)}`}
                     alt={c.title}
                     className="h-10 w-10 rounded-lg object-cover shrink-0"
                   />
