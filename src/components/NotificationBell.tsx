@@ -33,19 +33,15 @@ function timeAgo(iso: string): string {
 
 function loadDismissed(): Set<string> {
   try {
-    const saved = localStorage.getItem("dismissedNotifications");
+    const saved = localStorage.getItem("rr_dismissed_v2");
     if (!saved) return new Set();
-    const parsed: { id: string; dismissedAt: string }[] = JSON.parse(saved);
-    // Clear dismissals older than 24 hours
-    const fresh = parsed.filter(d => Date.now() - new Date(d.dismissedAt).getTime() < 7 * 24 * 60 * 60 * 1000);
-    return new Set(fresh.map(d => d.id));
+    return new Set(JSON.parse(saved) as string[]);
   } catch { return new Set(); }
 }
 
 function saveDismissed(ids: Set<string>) {
   try {
-    const arr = Array.from(ids).map(id => ({ id, dismissedAt: new Date().toISOString() }));
-    localStorage.setItem("dismissedNotifications", JSON.stringify(arr));
+    localStorage.setItem("rr_dismissed_v2", JSON.stringify(Array.from(ids)));
   } catch {}
 }
 
