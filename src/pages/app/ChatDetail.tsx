@@ -245,7 +245,7 @@ const ChatDetail = () => {
         if (!res.ok) { if (!cancelled) setData(p => p ? { ...p, summaries: [] } : p); return; }
         const json: any = await res.json();
         const all: SummaryData[] = Array.isArray(json) ? json : (json?.summaries ?? []);
-        const filtered = all.filter(s => { const d = (s.date ? new Date(s.date).toLocaleDateString("en-GB") : "") ?? ""; return d >= dateFrom && d <= dateTo; });
+        const filtered = all.filter(s => { const d = s.date?.slice(0, 10) ?? ""; return d >= dateFrom && d <= dateTo; });
         if (!cancelled) setData(p => p ? { ...p, summaries: filtered } : p);
       } catch { if (!cancelled) setData(p => p ? { ...p, summaries: [] } : p); }
       finally { if (!cancelled) setSummaryLoading(false); }
