@@ -187,13 +187,13 @@ const Onboarding = () => {
             <div className="space-y-6">
               <div>
                 <h2 className="text-2xl font-bold">Connect your first chat</h2>
-                <p className="text-muted-foreground mt-1">Add the bot to a Telegram group and grant admin rights.</p>
+                <p className="text-muted-foreground mt-1">Add the bot to a Telegram group as a regular member — no admin needed.</p>
               </div>
               <ol className="space-y-4 text-sm">
                 {[
                   { t: "Open the Telegram group you want to monitor", d: "Pick a group with regular activity for the best demo." },
                   { t: "Tap the group name → Add member → @ReplyRadarBot", d: "The bot will join silently — no notification to members." },
-                  { t: "Make the bot an admin", d: "It only needs read access. We never send messages on your behalf." },
+                  { t: "Add @Sumerz_bot to your group (no admin needed)", d: "It only needs read access. We never send messages on your behalf." },
                   { t: "Send /connect in the group", d: "The chat will appear in your dashboard within seconds." },
                 ].map((s, i) => (
                   <li key={s.t} className="flex gap-3">
