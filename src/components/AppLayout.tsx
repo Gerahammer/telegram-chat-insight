@@ -12,7 +12,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
-import { Bell, LogOut, User, Building2 } from "lucide-react";
+import { LogOut, User, Building2 } from "lucide-react";
+import { NotificationBell } from "@/components/NotificationBell";
 import { apiFetch, clearAuthToken } from "@/lib/api";
 import { WorkspaceStatsProvider } from "@/lib/workspace-stats";
 
@@ -98,9 +99,7 @@ export default function AppLayout() {
                 <span className="text-sm font-medium">{workspaceName}</span>
               </div>
               <div className="ml-auto flex items-center gap-2">
-                <Button variant="ghost" size="icon" className="relative">
-                  <Bell className="h-4 w-4" />
-                </Button>
+                <NotificationBell />
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" className="h-9 gap-2 px-2">
