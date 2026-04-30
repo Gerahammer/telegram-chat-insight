@@ -165,7 +165,12 @@ const ChatDetail = () => {
   const [health, setHealth] = useState<HealthData | null>(null);
   const [sideLoading, setSideLoading] = useState(false);
   const [askQuestion, setAskQuestion] = useState("");
-  const [askHistory, setAskHistory] = useState<{question: string; answer: string}[]>([]);
+  const [askHistory, setAskHistory] = useState<{question: string; answer: string}[]>(() => {
+    try {
+      const saved = localStorage.getItem(`askHistory-${id}`);
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
   const [askSlide, setAskSlide] = useState(0);
   const [askLoading, setAskLoading] = useState(false);
   const [askRemaining, setAskRemaining] = useState<number | null>(null);
@@ -329,7 +334,11 @@ const ChatDetail = () => {
       if (!res.ok) {
         setAskError(data.message ?? data.error ?? "Failed");
       } else {
-        setAskHistory(prev => [{question: askQuestion, answer: data.answer}, ...prev].slice(0, 5));
+        setAskHistory(prev => {
+          const next = [{question: askQuestion, answer: data.answer}, ...prev].slice(0, 5);
+          try { localStorage.setItem(`askHistory-${id}`, JSON.stringify(next)); } catch {}
+          return next;
+        });
         setAskSlide(0);
         setAskRemaining(data.remaining);
         setAskQuestion("");
