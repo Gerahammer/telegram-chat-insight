@@ -166,6 +166,7 @@ const ChatDetail = () => {
   const [sideLoading, setSideLoading] = useState(false);
   const [askQuestion, setAskQuestion] = useState("");
   const [askHistory, setAskHistory] = useState<{question: string; answer: string}[]>([]);
+  const [askSlide, setAskSlide] = useState(0);
   const [askLoading, setAskLoading] = useState(false);
   const [askRemaining, setAskRemaining] = useState<number | null>(null);
   const [askError, setAskError] = useState<string | null>(null);
@@ -329,6 +330,7 @@ const ChatDetail = () => {
         setAskError(data.message ?? data.error ?? "Failed");
       } else {
         setAskHistory(prev => [{question: askQuestion, answer: data.answer}, ...prev].slice(0, 5));
+        setAskSlide(0);
         setAskRemaining(data.remaining);
         setAskQuestion("");
       }
@@ -591,13 +593,31 @@ const ChatDetail = () => {
             )}
             {askError && <p className="text-sm text-destructive mb-2">{askError}</p>}
             {askHistory.length > 0 && (
-              <div className="space-y-2 max-h-[280px] overflow-y-auto pr-1">
-                {askHistory.map((item, i) => (
-                  <div key={i} className="p-3 rounded-lg bg-background border border-primary/20">
-                    <p className="text-xs font-medium text-muted-foreground mb-1">Q: {item.question}</p>
-                    <p className="text-sm leading-relaxed">{item.answer}</p>
+              <div className="relative">
+                <div className="overflow-hidden rounded-lg border border-primary/20 bg-background">
+                  <div
+                    className="flex transition-transform duration-300 ease-in-out"
+                    style={{ transform: `translateX(-${askSlide * 100}%)` }}
+                  >
+                    {askHistory.map((item, i) => (
+                      <div key={i} className="min-w-full p-3">
+                        <p className="text-xs font-medium text-muted-foreground mb-1">Q: {item.question}</p>
+                        <p className="text-sm leading-relaxed">{item.answer}</p>
+                      </div>
+                    ))}
                   </div>
-                ))}
+                </div>
+                {askHistory.length > 1 && (
+                  <div className="flex items-center justify-between mt-2">
+                    <button onClick={() => setAskSlide(s => Math.max(0, s - 1))}
+                      disabled={askSlide === 0}
+                      className="text-xs text-muted-foreground hover:text-primary disabled:opacity-30 transition">← Prev</button>
+                    <span className="text-xs text-muted-foreground">{askSlide + 1} / {askHistory.length}</span>
+                    <button onClick={() => setAskSlide(s => Math.min(askHistory.length - 1, s + 1))}
+                      disabled={askSlide === askHistory.length - 1}
+                      className="text-xs text-muted-foreground hover:text-primary disabled:opacity-30 transition">Next →</button>
+                  </div>
+                )}
               </div>
             )}
           </Card>
