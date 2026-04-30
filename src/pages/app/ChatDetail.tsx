@@ -165,7 +165,7 @@ const ChatDetail = () => {
   const [health, setHealth] = useState<HealthData | null>(null);
   const [sideLoading, setSideLoading] = useState(false);
   const [askQuestion, setAskQuestion] = useState("");
-  const [askAnswer, setAskAnswer] = useState<string | null>(null);
+  const [askHistory, setAskHistory] = useState<{question: string; answer: string}[]>([]);
   const [askLoading, setAskLoading] = useState(false);
   const [askRemaining, setAskRemaining] = useState<number | null>(null);
   const [askError, setAskError] = useState<string | null>(null);
@@ -328,8 +328,9 @@ const ChatDetail = () => {
       if (!res.ok) {
         setAskError(data.message ?? data.error ?? "Failed");
       } else {
-        setAskAnswer(data.answer);
+        setAskHistory(prev => [{question: askQuestion, answer: data.answer}, ...prev].slice(0, 5));
         setAskRemaining(data.remaining);
+        setAskQuestion("");
       }
     } catch {
       setAskError("Request failed");
@@ -588,11 +589,15 @@ const ChatDetail = () => {
             {askRemaining !== null && (
               <p className="text-xs text-muted-foreground mb-2">{askRemaining} searches remaining this hour</p>
             )}
-            {askError && <p className="text-sm text-destructive">{askError}</p>}
-            {askAnswer && (
-              <div className="p-3 rounded-lg bg-background border border-primary/20">
-                <p className="text-xs font-medium text-primary mb-1">AI Answer</p>
-                <p className="text-sm leading-relaxed">{askAnswer}</p>
+            {askError && <p className="text-sm text-destructive mb-2">{askError}</p>}
+            {askHistory.length > 0 && (
+              <div className="space-y-2 max-h-[280px] overflow-y-auto pr-1">
+                {askHistory.map((item, i) => (
+                  <div key={i} className="p-3 rounded-lg bg-background border border-primary/20">
+                    <p className="text-xs font-medium text-muted-foreground mb-1">Q: {item.question}</p>
+                    <p className="text-sm leading-relaxed">{item.answer}</p>
+                  </div>
+                ))}
               </div>
             )}
           </Card>
