@@ -1,3 +1,4 @@
+import { UserAvatar } from "@/components/UserAvatar";
 import { Link, useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
@@ -480,9 +481,10 @@ const ChatDetail = () => {
               <div className="space-y-3 max-h-[400px] overflow-y-auto pr-1">
                 {messages.map(m => (
                   <div key={m.id} className="flex gap-3">
-                    <div className="h-8 w-8 rounded-full bg-secondary flex items-center justify-center text-xs font-semibold shrink-0">
-                      {m.author?.split(" ").map((s: string) => s[0]).join("").slice(0, 2) || "?"}
-                    </div>
+                    <UserAvatar name={m.author} size="md" />
+
+
+
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 text-xs">
                         <span className="font-semibold">{m.author}</span>

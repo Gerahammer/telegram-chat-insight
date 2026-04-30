@@ -146,8 +146,6 @@ const ChatRow = ({ c }: { c: ApiChat }) => {
       <div className="flex items-center gap-4 p-4 rounded-lg border border-border hover:border-primary/40 hover:bg-secondary/30 transition">
         {c.photoUrl ? <img src={`https://seahorse-app-47666.ondigitalocean.app/api/proxy/image?url=${encodeURIComponent(c.photoUrl)}`} alt={c.title} className="h-9 w-9 rounded-lg object-cover shrink-0" /> : <div className="h-9 w-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0"><Hash className="h-4 w-4" /></div>}
           <Hash className="h-4 w-4" />
-        </div>
-
         {/* Title */}
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
