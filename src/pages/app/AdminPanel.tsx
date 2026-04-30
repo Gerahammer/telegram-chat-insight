@@ -63,6 +63,8 @@ export default function AdminPanel() {
   const [loading, setLoading] = useState(true);
   const [userQ, setUserQ] = useState("");
   const [updating, setUpdating] = useState<string | null>(null);
+  const [settings, setSettings] = useState<any>(null);
+  const [savingSettings, setSavingSettings] = useState(false);
 
   const fetchOverview = async () => {
     const res = await apiFetch("/api/admin/overview").catch(() => null);
@@ -89,6 +91,8 @@ export default function AdminPanel() {
     (async () => {
       setLoading(true);
       await Promise.all([fetchOverview(), fetchUsers(), fetchCompanies()]);
+      const sRes = await apiFetch("/api/admin/settings").catch(() => null);
+      if (sRes?.ok) { const d = await sRes.json(); setSettings(d.settings); }
       setLoading(false);
     })();
   }, []);
@@ -143,7 +147,7 @@ export default function AdminPanel() {
 
       {/* Tabs */}
       <div className="flex gap-1 border-b">
-        {(["overview", "users", "companies"] as const).map(t => (
+        {(["overview", "users", "companies", "settings"] as const).map(t => (
           <button key={t} onClick={() => setTab(t)}
             className={`px-4 py-2 text-sm font-medium capitalize transition border-b-2 -mb-px ${
               tab === t ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
@@ -246,6 +250,54 @@ export default function AdminPanel() {
               </Card>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Settings tab */}
+      {tab === "settings" && (
+        <div className="space-y-6 max-w-lg">
+          <Card className="p-6">
+            <h2 className="font-semibold mb-4">AI Generation Settings</h2>
+            {!settings ? <p className="text-sm text-muted-foreground">Loading...</p> : (
+              <div className="space-y-4">
+                <div>
+                  <label className="text-sm font-medium block mb-1">Auto-summary interval (minutes)</label>
+                  <Input type="number" min={5} max={120}
+                    value={settings.autoSummaryIntervalMin}
+                    onChange={e => setSettings((s: any) => ({ ...s, autoSummaryIntervalMin: parseInt(e.target.value) }))}
+                    className="w-32" />
+                  <p className="text-xs text-muted-foreground mt-1">How often to check for new messages (default: 30)</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium block mb-1">Daily summary hour (UTC)</label>
+                  <Input type="number" min={0} max={23}
+                    value={settings.dailySummaryHourUTC}
+                    onChange={e => setSettings((s: any) => ({ ...s, dailySummaryHourUTC: parseInt(e.target.value) }))}
+                    className="w-32" />
+                  <p className="text-xs text-muted-foreground mt-1">Hour to run daily summary (default: 8 = 8AM UTC)</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium block mb-1">Min messages to trigger summary</label>
+                  <Input type="number" min={1} max={20}
+                    value={settings.minMessagesForSummary}
+                    onChange={e => setSettings((s: any) => ({ ...s, minMessagesForSummary: parseInt(e.target.value) }))}
+                    className="w-32" />
+                  <p className="text-xs text-muted-foreground mt-1">Minimum new messages needed (default: 3)</p>
+                </div>
+                <Button disabled={savingSettings} onClick={async () => {
+                  setSavingSettings(true);
+                  try {
+                    const res = await apiFetch("/api/admin/settings", { method: "PATCH", body: JSON.stringify(settings) });
+                    if (res.ok) toast.success("Settings saved");
+                    else toast.error("Failed to save");
+                  } catch { toast.error("Failed to save"); }
+                  finally { setSavingSettings(false); }
+                }}>
+                  {savingSettings ? "Saving..." : "Save settings"}
+                </Button>
+              </div>
+            )}
+          </Card>
         </div>
       )}
 
