@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from "react-router-dom";
-import { LayoutDashboard, MessagesSquare, ListTodo, MoonStar, FileText, Settings, CreditCard, Search, GitCommit } from "lucide-react";
+import { LayoutDashboard, MessagesSquare, ListTodo, MoonStar, FileText, Settings, CreditCard, Search, GitCommit, CalendarDays } from "lucide-react";
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent,
   SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem,
@@ -37,6 +37,7 @@ export function AppSidebar() {
       badge: loading ? undefined : String(noActivityCount ?? 0) },
     { title: "Summaries",    url: "/app/summaries",    icon: FileText },
     { title: "Search",       url: "/app/search",       icon: Search },
+    { title: "Calendar",    url: "/app/calendar",    icon: CalendarDays },
   ];
 
   return (
