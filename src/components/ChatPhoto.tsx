@@ -22,7 +22,6 @@ export function ChatPhoto({ photoUrl, title = "", size = "md" }: ChatPhotoProps)
         src={`${PROXY}?url=${encodeURIComponent(photoUrl)}`}
         alt={title}
         className={`${s} rounded-lg object-cover shrink-0`}
-        }}
       />
     );
   }
