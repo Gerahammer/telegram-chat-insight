@@ -6,29 +6,46 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { TimeAgo } from "@/components/Badges";
 import { Hash, MoonStar, Bell } from "lucide-react";
 import { apiFetch } from "@/lib/api";
-import type { Chat } from "@/lib/mock-data";
+
+interface ApiChat {
+  id: string;
+  title: string;
+  chatType?: string;
+  isActive?: boolean;
+  lastActivityAt?: string;
+  messageCount?: number;
+  photoUrl?: string;
+  todaySummary?: { noActivity?: boolean } | null;
+}
 
 const NoActivity = () => {
-  const [chats, setChats] = useState<Chat[]>([]);
+  const [chats, setChats] = useState<ApiChat[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    let cancelled = false;
     (async () => {
       try {
         const res = await apiFetch("/api/chats");
         if (res.ok) {
           const data = await res.json();
-          const list: Chat[] = Array.isArray(data) ? data : data?.items ?? [];
-          if (!cancelled) setChats(list);
+          const list: ApiChat[] = Array.isArray(data) ? data : (data?.chats ?? []);
+          setChats(list);
         }
       } catch { /* empty */ }
-      if (!cancelled) setLoading(false);
+      setLoading(false);
     })();
-    return () => { cancelled = true; };
   }, []);
 
-  const quiet = chats.filter((c) => c.attention === "no_activity");
+  // A chat has no activity if:
+  // - it has no messages today (todaySummary.noActivity = true), OR
+  // - it has no summary at all and lastActivityAt is > 24h ago
+  const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const quiet = chats.filter(c => {
+    if (c.todaySummary?.noActivity) return true;
+    if (!c.todaySummary && c.lastActivityAt && new Date(c.lastActivityAt) < since24h) return true;
+    if (!c.todaySummary && !c.lastActivityAt) return true;
+    return false;
+  });
 
   return (
     <div className="space-y-6 max-w-[1400px] mx-auto">
@@ -39,38 +56,57 @@ const NoActivity = () => {
 
       <Card className="p-6 bg-gradient-to-br from-warning/5 to-transparent border-warning/20">
         <div className="flex items-start gap-3">
-          <div className="h-9 w-9 rounded-lg bg-warning/10 text-warning flex items-center justify-center shrink-0"><Bell className="h-4 w-4" /></div>
+          <div className="h-9 w-9 rounded-lg bg-warning/10 text-warning flex items-center justify-center shrink-0">
+            <Bell className="h-4 w-4" />
+          </div>
           <div>
-            <h2 className="font-semibold">{loading ? "Checking your chats…" : `${quiet.length} chats are quiet today`}</h2>
-            <p className="text-sm text-muted-foreground mt-1">Sometimes silence is fine — but it can also mean disengagement. Check in if needed.</p>
+            <h2 className="font-semibold">
+              {loading ? "Checking your chats…" : `${quiet.length} chat${quiet.length === 1 ? "" : "s"} quiet today`}
+            </h2>
+            <p className="text-sm text-muted-foreground mt-1">
+              Sometimes silence is fine — but it can also mean disengagement. Check in if needed.
+            </p>
           </div>
         </div>
       </Card>
 
       <div className="grid md:grid-cols-2 gap-4">
         {loading ? (
-          <>
-            <Skeleton className="h-28 w-full" />
-            <Skeleton className="h-28 w-full" />
-          </>
+          <><Skeleton className="h-28 w-full" /><Skeleton className="h-28 w-full" /></>
         ) : quiet.length === 0 ? (
-          <Card className="md:col-span-2 p-12 text-center text-muted-foreground">All your chats are active today 🎉</Card>
+          <Card className="md:col-span-2 p-12 text-center text-muted-foreground">
+            <MoonStar className="h-10 w-10 mx-auto mb-3 opacity-40" />
+            <p className="text-sm">All your chats are active today 🎉</p>
+          </Card>
         ) : (
-          quiet.map((c) => (
+          quiet.map(c => (
             <Card key={c.id} className="p-5 hover:shadow-md transition">
               <div className="flex items-start gap-3">
-                <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center text-muted-foreground"><Hash className="h-4 w-4" /></div>
+                {c.photoUrl ? (
+                  <img
+                    src={`https://seahorse-app-47666.ondigitalocean.app/api/proxy/image?url=${encodeURIComponent(c.photoUrl)}`}
+                    alt={c.title}
+                    className="h-10 w-10 rounded-lg object-cover shrink-0"
+                  />
+                ) : (
+                  <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center text-muted-foreground shrink-0">
+                    <Hash className="h-4 w-4" />
+                  </div>
+                )}
                 <div className="flex-1">
                   <div className="flex items-center justify-between">
-                    <div className="font-semibold">{c.name}</div>
+                    <div className="font-semibold">{c.title}</div>
                     <MoonStar className="h-4 w-4 text-muted-foreground" />
                   </div>
                   <div className="text-xs text-muted-foreground mt-1">
-                    {c.members ?? 0} members{c.lastActivity ? <> · last activity <TimeAgo iso={c.lastActivity} /></> : null}
+                    {c.lastActivityAt
+                      ? <>Last activity: <TimeAgo iso={c.lastActivityAt} /></>
+                      : "No recent activity"}
                   </div>
-                  <div className="mt-3 flex gap-2">
-                    <Button variant="outline" size="sm" asChild><Link to={`/app/chats/${c.id}`}>Open chat</Link></Button>
-                    <Button variant="ghost" size="sm">Snooze</Button>
+                  <div className="mt-3">
+                    <Button variant="outline" size="sm" asChild>
+                      <Link to={`/app/chats/${c.id}`}>Open chat</Link>
+                    </Button>
                   </div>
                 </div>
               </div>
