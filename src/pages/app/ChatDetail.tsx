@@ -541,23 +541,29 @@ const ChatDetail = () => {
               </div>
             ) : (
               <div className="space-y-3 max-h-[400px] overflow-y-auto pr-1">
-                {messages.map(m => (
-                  <div key={m.id} className="flex gap-3">
-                    <UserAvatar name={m.author} size="md" />
-
-
-
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 text-xs">
-                        <span className="font-semibold">{m.author}</span>
-                        <span className="text-muted-foreground">
-                          {m.time ? new Date(m.time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : ""}
-                        </span>
+                {messages.map(m => {
+                  const text = m.text ?? "";
+                  const isQ = text.includes("?");
+                  const isCom = /\b(i will|i'll|will do|tomorrow|by monday|by tuesday|by friday|by \d)\b/i.test(text);
+                  const isUnans = allUnanswered.some(u => u.q && text.toLowerCase().startsWith(u.q.toLowerCase().slice(0, 25)));
+                  return (
+                    <div key={m.id} className="flex gap-3">
+                      <UserAvatar name={m.author} size="md" />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 text-xs flex-wrap">
+                          <span className="font-semibold">{m.author}</span>
+                          <span className="text-muted-foreground">
+                            {m.time ? new Date(m.time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : ""}
+                          </span>
+                          {isUnans && <span className="px-1.5 py-0.5 rounded-full bg-warning/10 text-warning text-xs">Unanswered</span>}
+                          {isCom && !isUnans && <span className="px-1.5 py-0.5 rounded-full bg-blue-500/10 text-blue-500 text-xs">Commitment</span>}
+                          {isQ && !isUnans && !isCom && <span className="px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground text-xs">Question</span>}
+                        </div>
+                        <p className="text-sm mt-0.5">{m.text}</p>
                       </div>
-                      <p className="text-sm mt-0.5">{m.text}</p>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </Card>
