@@ -165,6 +165,7 @@ const ChatDetail = () => {
   const [health, setHealth] = useState<HealthData | null>(null);
   const [sideLoading, setSideLoading] = useState(false);
   const [askQuestion, setAskQuestion] = useState("");
+  const [showAllMessages, setShowAllMessages] = useState(false);
   const [askAnswer, setAskAnswer] = useState<string | null>(null);
   const [askLoading, setAskLoading] = useState(false);
   const [askRemaining, setAskRemaining] = useState<number | null>(null);
@@ -607,7 +608,7 @@ const ChatDetail = () => {
               </div>
             ) : (
               <div className="space-y-3 max-h-[400px] overflow-y-auto pr-1">
-                {messages.map(m => {
+                {(showAllMessages ? messages : messages.slice(-5)).map(m => {
                   const text = m.text ?? "";
                   const isQ = text.includes("?");
                   const isCom = /\b(i will|i'll|will do|tomorrow|by monday|by tuesday|by friday|by \d)\b/i.test(text);
