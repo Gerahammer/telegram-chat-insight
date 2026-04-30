@@ -14,6 +14,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
+import { ChatPhoto } from "@/components/ChatPhoto";
 import { toast } from "sonner";
 import type { Chat, ActionItem, Message } from "@/lib/mock-data";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
