@@ -10,8 +10,8 @@ interface Notification {
   type: "attention" | "unanswered" | "overdue" | "action";
   title: string;
   subtitle: string;
-  chatId?: string;
   link: string;
+  createdAt: string; // ISO string
 }
 
 const TYPE_CONFIG = {
@@ -21,12 +21,54 @@ const TYPE_CONFIG = {
   action:     { icon: ListTodo,      cls: "text-primary",     label: "Open action item" },
 };
 
+function timeAgo(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${Math.floor(hrs / 24)}d ago`;
+}
+
+function loadDismissed(): Set<string> {
+  try {
+    const saved = localStorage.getItem("dismissedNotifications");
+    if (!saved) return new Set();
+    const parsed: { id: string; dismissedAt: string }[] = JSON.parse(saved);
+    // Clear dismissals older than 24 hours
+    const fresh = parsed.filter(d => Date.now() - new Date(d.dismissedAt).getTime() < 24 * 60 * 60 * 1000);
+    return new Set(fresh.map(d => d.id));
+  } catch { return new Set(); }
+}
+
+function saveDismissed(ids: Set<string>) {
+  try {
+    const arr = Array.from(ids).map(id => ({ id, dismissedAt: new Date().toISOString() }));
+    localStorage.setItem("dismissedNotifications", JSON.stringify(arr));
+  } catch {}
+}
+
 export function NotificationBell() {
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(false);
-  const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+  const [dismissed, setDismissed] = useState<Set<string>>(loadDismissed);
   const ref = useRef<HTMLDivElement>(null);
+
+  const dismiss = (id: string) => {
+    setDismissed(prev => {
+      const next = new Set([...prev, id]);
+      saveDismissed(next);
+      return next;
+    });
+  };
+
+  const dismissAll = () => {
+    const allIds = new Set(notifications.map(n => n.id));
+    saveDismissed(allIds);
+    setDismissed(allIds);
+  };
 
   const fetchNotifications = async () => {
     setLoading(true);
@@ -37,62 +79,56 @@ export function NotificationBell() {
       ]);
 
       const notes: Notification[] = [];
+      const now = new Date().toISOString();
 
       if (chatsRes?.ok) {
         const data = await chatsRes.json();
         const chats = Array.isArray(data) ? data : (data?.chats ?? []);
 
-        chats.forEach((c: any) => {
-          // Chats needing attention
+        for (const c of chats) {
           if (c.todaySummary?.requiresAttention) {
             notes.push({
               id: `attention-${c.id}`,
               type: "attention",
               title: c.title,
               subtitle: "Needs your attention",
-              chatId: c.id,
               link: `/app/chats/${c.id}`,
+              createdAt: c.todaySummary.generatedAt ?? now,
             });
           }
-          // Unanswered questions
-          if (c.todaySummary?.unansweredQuestions?.length > 0) {
+          const unansweredCount = c.todaySummary?.unansweredQuestions?.length ?? 0;
+          if (unansweredCount > 0) {
             notes.push({
               id: `unanswered-${c.id}`,
               type: "unanswered",
               title: c.title,
-              subtitle: `${c.todaySummary.unansweredQuestions.length} unanswered question${c.todaySummary.unansweredQuestions.length > 1 ? "s" : ""}`,
-              chatId: c.id,
+              subtitle: `${unansweredCount} unanswered question${unansweredCount > 1 ? "s" : ""}`,
               link: `/app/chats/${c.id}`,
+              createdAt: c.todaySummary?.generatedAt ?? now,
             });
           }
-        });
-      }
+        }
 
-      // Overdue commitments
-      const chatsRes2 = await apiFetch("/api/chats").catch(() => null);
-      if (chatsRes2?.ok) {
-        const data = await chatsRes2.json();
-        const chats = Array.isArray(data) ? data : (data?.chats ?? []);
+        // Overdue commitments per chat
         await Promise.all(chats.map(async (c: any) => {
-          const cmRes = await apiFetch(`/api/chats/${c.id}/commitments?status=OVERDUE`).catch(() => null);
+          const cmRes = await apiFetch(`/api/chats/${c.id}/commitments`).catch(() => null);
           if (cmRes?.ok) {
             const cmData = await cmRes.json();
-            const overdue = cmData?.commitments ?? [];
+            const overdue = (cmData?.commitments ?? []).filter((cm: any) => cm.status === "OVERDUE");
             if (overdue.length > 0) {
               notes.push({
                 id: `overdue-${c.id}`,
                 type: "overdue",
                 title: c.title,
                 subtitle: `${overdue.length} overdue commitment${overdue.length > 1 ? "s" : ""}`,
-                chatId: c.id,
                 link: `/app/commitments`,
+                createdAt: overdue[0].createdAt ?? now,
               });
             }
           }
         }));
       }
 
-      // Open action items
       if (actionsRes?.ok) {
         const data = await actionsRes.json();
         const actions = Array.isArray(data) ? data : (data?.actionItems ?? data?.items ?? []);
@@ -101,8 +137,9 @@ export function NotificationBell() {
             id: "open-actions",
             type: "action",
             title: `${actions.length} open action item${actions.length > 1 ? "s" : ""}`,
-            subtitle: "Tap to view",
+            subtitle: "Tap to view all",
             link: "/app/action-items",
+            createdAt: actions[0]?.createdAt ?? now,
           });
         }
       }
@@ -114,16 +151,13 @@ export function NotificationBell() {
 
   useEffect(() => {
     fetchNotifications();
-    const interval = setInterval(fetchNotifications, 5 * 60 * 1000); // refresh every 5 min
+    const interval = setInterval(fetchNotifications, 5 * 60 * 1000);
     return () => clearInterval(interval);
   }, []);
 
-  // Close on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
@@ -145,13 +179,11 @@ export function NotificationBell() {
 
       {open && (
         <div className="absolute right-0 top-10 w-80 bg-card border border-border rounded-xl shadow-lg z-50 overflow-hidden">
-          {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b">
-            <span className="font-semibold text-sm">Notifications</span>
+            <span className="font-semibold text-sm">Notifications {count > 0 && <Badge variant="secondary" className="ml-1 text-xs">{count}</Badge>}</span>
             <div className="flex items-center gap-2">
               {count > 0 && (
-                <button onClick={() => setDismissed(new Set(notifications.map(n => n.id)))}
-                  className="text-xs text-muted-foreground hover:text-foreground transition">
+                <button onClick={dismissAll} className="text-xs text-muted-foreground hover:text-foreground transition">
                   Clear all
                 </button>
               )}
@@ -161,7 +193,6 @@ export function NotificationBell() {
             </div>
           </div>
 
-          {/* List */}
           <div className="max-h-[400px] overflow-y-auto">
             {loading ? (
               <div className="p-4 text-sm text-muted-foreground text-center">Loading...</div>
@@ -177,13 +208,22 @@ export function NotificationBell() {
                 return (
                   <div key={n.id} className="flex items-start gap-3 px-4 py-3 hover:bg-muted/50 transition border-b last:border-0">
                     <Icon className={`h-4 w-4 mt-0.5 shrink-0 ${cfg.cls}`} />
-                    <Link to={n.link} className="flex-1 min-w-0" onClick={() => { setOpen(false); setDismissed(d => new Set([...d, n.id])); }}>
+                    <Link
+                      to={n.link}
+                      className="flex-1 min-w-0"
+                      onClick={() => { setOpen(false); dismiss(n.id); }}
+                    >
                       <p className="text-sm font-medium leading-tight">{n.title}</p>
                       <p className="text-xs text-muted-foreground mt-0.5">{n.subtitle}</p>
-                      <Badge variant="outline" className={`text-xs mt-1 ${cfg.cls}`}>{cfg.label}</Badge>
+                      <div className="flex items-center gap-2 mt-1">
+                        <Badge variant="outline" className={`text-xs ${cfg.cls}`}>{cfg.label}</Badge>
+                        <span className="text-xs text-muted-foreground">{timeAgo(n.createdAt)}</span>
+                      </div>
                     </Link>
-                    <button onClick={() => setDismissed(d => new Set([...d, n.id]))}
-                      className="text-muted-foreground hover:text-foreground transition shrink-0">
+                    <button
+                      onClick={() => dismiss(n.id)}
+                      className="text-muted-foreground hover:text-foreground transition shrink-0 mt-0.5"
+                    >
                       <X className="h-3.5 w-3.5" />
                     </button>
                   </div>
