@@ -348,7 +348,7 @@ const ChatDetail = () => {
                 </Badge>
                 {(chat as any).telegramChatId && (
                   <a
-                    href={'https://t.me/c/' + String((chat as any).telegramChatId).replace(/-100/, '')}
+                    href={'https://web.telegram.org/k/#' + String((chat as any).telegramChatId)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-xs flex items-center gap-1 text-primary hover:underline"
