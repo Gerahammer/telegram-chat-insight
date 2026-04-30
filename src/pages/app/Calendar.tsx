@@ -176,7 +176,7 @@ export default function CalendarPage() {
               {Array.from({ length: daysInM }, (_, i) => i + 1).map(day => {
 
                 const dayEvents = getEventsForDay(day, yOffset, mOffset);
-                const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+                const dateStr = `${yOffset}-${String(mOffset + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
                 const isToday = dateStr === todayStr;
                 const isSelected = dateStr === selectedDate;
                 const isPast = dateStr < todayStr;
