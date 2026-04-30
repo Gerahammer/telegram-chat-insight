@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { TimeAgo } from "@/components/Badges";
-import { CheckCircle2, Clock, AlertTriangle, XCircle, RefreshCw } from "lucide-react";
+import { CheckCircle2, Clock, AlertTriangle, XCircle, RefreshCw, RotateCcw } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { toast } from "sonner";
 
@@ -205,14 +205,15 @@ const Commitments = () => {
                   </div>
                 </div>
                 {(c.status === "OPEN" || c.status === "OVERDUE") && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={updating === c.id}
-                    onClick={() => updateStatus(c.id, c.chatId, "COMPLETED")}
-                    className="shrink-0"
-                  >
+                  <Button size="sm" variant="outline" disabled={updating === c.id}
+                    onClick={() => updateStatus(c.id, c.chatId, "COMPLETED")} className="shrink-0">
                     <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" /> Mark done
+                  </Button>
+                )}
+                {c.status === "COMPLETED" && (
+                  <Button size="sm" variant="outline" disabled={updating === c.id}
+                    onClick={() => updateStatus(c.id, c.chatId, "OPEN")} className="shrink-0 text-muted-foreground">
+                    <RotateCcw className="h-3.5 w-3.5 mr-1.5" /> Reopen
                   </Button>
                 )}
               </div>
