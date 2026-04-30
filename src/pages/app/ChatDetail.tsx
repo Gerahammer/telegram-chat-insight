@@ -701,6 +701,26 @@ const ChatDetail = () => {
                   </p>
                 </div>
               </div>
+              {(health as any).components && (
+                <div className="space-y-2 mb-4">
+                  {[
+                    { label: "Activity", score: (health as any).components.activityScore },
+                    { label: "Response", score: (health as any).components.responseScore },
+                    { label: "Open tasks", score: (health as any).components.tasksScore },
+                  ].map(c => {
+                    const color = c.score >= 80 ? "hsl(142 76% 36%)" : c.score >= 60 ? "hsl(38 92% 50%)" : "hsl(var(--destructive))";
+                    return (
+                      <div key={c.label} className="flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground w-20 shrink-0">{c.label}</span>
+                        <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                          <div className="h-full rounded-full transition-all" style={{ width: `${c.score}%`, background: color }} />
+                        </div>
+                        <span className="text-xs font-medium w-6 text-right">{c.score}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
               {health.recurringIssues.length > 0 && (
                 <div className="space-y-2">
                   <p className="text-xs font-medium text-muted-foreground">Recurring issues</p>
