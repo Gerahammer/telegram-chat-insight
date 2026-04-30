@@ -439,7 +439,7 @@ const ChatDetail = () => {
                   </div>
                 ) : (
                   <>
-                    <div className="text-sm leading-relaxed space-y-1">
+                    <div className="text-sm leading-relaxed space-y-1 max-h-48 overflow-y-auto pr-1">
                       {summaries[0].noActivity ? "No messages on this day." :
                         (summaries[0].summaryText ?? "").split("•").filter(Boolean).map((point, i) => (
                           <div key={i} className="flex gap-2">
