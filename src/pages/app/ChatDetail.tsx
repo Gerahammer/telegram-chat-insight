@@ -346,6 +346,16 @@ const ChatDetail = () => {
                 <Badge variant="outline" className={`text-xs ${chat.isActive ? "bg-success/10 text-success border-success/20" : "bg-muted text-muted-foreground"}`}>
                   {chat.isActive ? "Active" : "Inactive"}
                 </Badge>
+                {(chat as any).telegramChatId && (
+                  <a
+                    href={'https://t.me/c/' + String((chat as any).telegramChatId).replace(/-100/, '')}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs flex items-center gap-1 text-primary hover:underline"
+                  >
+                    Open in Telegram ↗
+                  </a>
+                )}
               </div>
             </div>
           </div>
