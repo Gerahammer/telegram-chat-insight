@@ -164,6 +164,11 @@ const ChatDetail = () => {
   const [commitments, setCommitments] = useState<Commitment[]>([]);
   const [health, setHealth] = useState<HealthData | null>(null);
   const [sideLoading, setSideLoading] = useState(false);
+  const [askQuestion, setAskQuestion] = useState("");
+  const [askAnswer, setAskAnswer] = useState<string | null>(null);
+  const [askLoading, setAskLoading] = useState(false);
+  const [askRemaining, setAskRemaining] = useState<number | null>(null);
+  const [askError, setAskError] = useState<string | null>(null);
 
   const fetchMessages = async () => {
     if (!id) return;
@@ -307,6 +312,30 @@ const ChatDetail = () => {
       setCommitments(p => p.map(c => c.id === cid ? { ...c, status: "COMPLETED" } : c));
       toast.success("Marked as done");
     } catch { toast.error("Failed to update"); }
+  };
+
+  const handleAsk = async () => {
+    if (!id || !askQuestion.trim() || askLoading) return;
+    setAskLoading(true);
+    setAskAnswer(null);
+    setAskError(null);
+    try {
+      const res = await apiFetch(`/api/chats/${encodeURIComponent(id)}/ask`, {
+        method: "POST",
+        body: JSON.stringify({ question: askQuestion }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setAskError(data.message ?? data.error ?? "Failed");
+      } else {
+        setAskAnswer(data.answer);
+        setAskRemaining(data.remaining);
+      }
+    } catch {
+      setAskError("Request failed");
+    } finally {
+      setAskLoading(false);
+    }
   };
 
   if (loading) return (
@@ -539,6 +568,34 @@ const ChatDetail = () => {
               </div>
             </Card>
           </div>
+
+          {/* AI Search */}
+          <Card className="p-5 border-primary/20 bg-gradient-to-br from-primary/5 to-transparent">
+            <SectionHeader icon={Sparkles} title="Ask AI about this chat" />
+            <div className="flex gap-2 mb-3">
+              <input
+                type="text"
+                value={askQuestion}
+                onChange={e => setAskQuestion(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && handleAsk()}
+                placeholder="What did Dan suggest about rates? When was the invoice discussed?"
+                className="flex-1 text-sm px-3 py-2 rounded-lg border border-border bg-background focus:outline-none focus:border-primary transition"
+              />
+              <Button size="sm" onClick={handleAsk} disabled={askLoading || !askQuestion.trim()} className="shrink-0">
+                {askLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Ask"}
+              </Button>
+            </div>
+            {askRemaining !== null && (
+              <p className="text-xs text-muted-foreground mb-2">{askRemaining} searches remaining this hour</p>
+            )}
+            {askError && <p className="text-sm text-destructive">{askError}</p>}
+            {askAnswer && (
+              <div className="p-3 rounded-lg bg-background border border-primary/20">
+                <p className="text-xs font-medium text-primary mb-1">AI Answer</p>
+                <p className="text-sm leading-relaxed">{askAnswer}</p>
+              </div>
+            )}
+          </Card>
 
           {/* Recent messages */}
           <Card className="p-5">
