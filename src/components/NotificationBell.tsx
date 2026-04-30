@@ -37,7 +37,7 @@ function loadDismissed(): Set<string> {
     if (!saved) return new Set();
     const parsed: { id: string; dismissedAt: string }[] = JSON.parse(saved);
     // Clear dismissals older than 24 hours
-    const fresh = parsed.filter(d => Date.now() - new Date(d.dismissedAt).getTime() < 24 * 60 * 60 * 1000);
+    const fresh = parsed.filter(d => Date.now() - new Date(d.dismissedAt).getTime() < 7 * 24 * 60 * 60 * 1000);
     return new Set(fresh.map(d => d.id));
   } catch { return new Set(); }
 }
