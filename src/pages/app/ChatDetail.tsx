@@ -359,10 +359,9 @@ const ChatDetail = () => {
               <div className="flex flex-wrap items-center gap-2 mt-1 text-sm text-muted-foreground">
                 {chat.type && <Badge variant="secondary" className="capitalize text-xs">{String(chat.type).toLowerCase()}</Badge>}
                 {(chat as any).memberCount != null && <span className="flex items-center gap-1 text-xs"><Users className="h-3 w-3" />{(chat as any).memberCount} members</span>}
-                {chat.lastActivity && <span className="text-xs flex items-center gap-1">Active <TimeAgo iso={chat.lastActivity} /></span>}
-                <span className="text-xs flex items-center gap-1"><MessageSquare className="h-3 w-3" />{chat.messagesToday ?? 0} today</span>
-                {(chat as any).lastSummarizedAt && <span className="text-xs">Last summary: <TimeAgo iso={(chat as any).lastSummarizedAt} /></span>}
-                {(chat as any).lastCheckedAt && <span className="text-xs text-muted-foreground">Last AI check: <TimeAgo iso={(chat as any).lastCheckedAt} /></span>}
+                {chat.lastActivity && <span className="text-xs text-muted-foreground">Active <TimeAgo iso={chat.lastActivity} /></span>}
+                {(chat as any).lastSummarizedAt && <span className="text-xs text-muted-foreground">Summarized <TimeAgo iso={(chat as any).lastSummarizedAt} /></span>}
+                {(chat as any).lastCheckedAt && <span className="text-xs text-muted-foreground">Checked <TimeAgo iso={(chat as any).lastCheckedAt} /></span>}
                 {(chat as any).healthLabel && (
                   <Badge variant="outline" className={`gap-1 text-xs ${healthCfg.cls}`}>
                     <HealthIcon className="h-3 w-3" />{healthCfg.label} {(chat as any).healthScore != null ? `· ${(chat as any).healthScore}` : ""}
