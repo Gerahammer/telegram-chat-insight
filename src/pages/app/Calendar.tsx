@@ -120,8 +120,8 @@ export default function CalendarPage() {
   const firstDay = getFirstDayOfMonth(year, month);
   const todayStr = new Date().toISOString().slice(0, 10);
 
-  const getEventsForDay = (day: number) => {
-    const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+  const getEventsForDay = (day: number, y: number = year, m: number = month) => {
+    const dateStr = `${y}-${String(m + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
     return events.filter(e => e.date === dateStr);
   };
 
@@ -178,8 +178,8 @@ export default function CalendarPage() {
             <div className="grid grid-cols-7 gap-0.5">
               {Array.from({ length: firstD }).map((_, i) => <div key={`empty-${i}`} />)}
               {Array.from({ length: daysInM }, (_, i) => i + 1).map(day => {
-                const daysInMonth = daysInM; const firstDay = firstD;
-                const dayEvents = getEventsForDay(day);
+
+                const dayEvents = getEventsForDay(day, yOffset, mOffset);
                 const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
                 const isToday = dateStr === todayStr;
                 const isSelected = day === selectedDay;
