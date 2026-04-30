@@ -497,9 +497,34 @@ const ChatDetail = () => {
               <div className="space-y-2">
                 {allUnanswered.length === 0
                   ? <p className="text-sm text-muted-foreground">No unanswered questions.</p>
-                  : allUnanswered.map((q, i) => (
-                    <div key={i} className="p-3 rounded-lg border border-border bg-warning/5">
-                      <p className="text-sm">{q}</p>
+                  : allUnanswered.map((item, i) => (
+                    <div key={i} className="p-3 rounded-lg border border-border bg-warning/5 flex items-start justify-between gap-2">
+                      <p className="text-sm flex-1">{item.q}</p>
+                      <button
+                        onClick={async () => {
+                          if (!id) return;
+                          try {
+                            const res = await apiFetch(`/api/chats/${id}/summaries/${item.summaryId}/unanswered`, {
+                              method: "PATCH",
+                              body: JSON.stringify({ index: item.index }),
+                            });
+                            if (res.ok) {
+                              setData(prev => prev ? {
+                                ...prev,
+                                summaries: prev.summaries?.map(s =>
+                                  s.id === item.summaryId
+                                    ? { ...s, unansweredQuestions: (s.unansweredQuestions ?? []).filter((_, idx) => idx !== item.index) }
+                                    : s
+                                )
+                              } : prev);
+                            }
+                          } catch {}
+                        }}
+                        className="text-xs text-muted-foreground hover:text-success transition shrink-0 mt-0.5"
+                        title="Mark as answered"
+                      >
+                        ✓ Answered
+                      </button>
                     </div>
                   ))}
               </div>
