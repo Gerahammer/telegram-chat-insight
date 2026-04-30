@@ -177,7 +177,7 @@ export function NotificationBell() {
                 return (
                   <div key={n.id} className="flex items-start gap-3 px-4 py-3 hover:bg-muted/50 transition border-b last:border-0">
                     <Icon className={`h-4 w-4 mt-0.5 shrink-0 ${cfg.cls}`} />
-                    <Link to={n.link} className="flex-1 min-w-0" onClick={() => setOpen(false)}>
+                    <Link to={n.link} className="flex-1 min-w-0" onClick={() => { setOpen(false); setDismissed(d => new Set([...d, n.id])); }}>
                       <p className="text-sm font-medium leading-tight">{n.title}</p>
                       <p className="text-xs text-muted-foreground mt-0.5">{n.subtitle}</p>
                       <Badge variant="outline" className={`text-xs mt-1 ${cfg.cls}`}>{cfg.label}</Badge>
