@@ -145,7 +145,7 @@ export default function CalendarPage() {
       </div>
 
       <div className="grid xl:grid-cols-3 gap-6">
-        {/* Calendar */}
+        {/* Calendar - 2 months */}
         <Card className="xl:col-span-2 p-6">
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
@@ -157,21 +157,28 @@ export default function CalendarPage() {
             </div>
           </div>
 
+          <div className="grid md:grid-cols-2 gap-8">
+          {[0, 1].map(offset => {
+            const mOffset = (month + offset) % 12;
+            const yOffset = year + Math.floor((month + offset) / 12);
+            const daysInM = getDaysInMonth(yOffset, mOffset);
+            const firstD = getFirstDayOfMonth(yOffset, mOffset);
+            return (
+            <div key={offset}>
+              <h3 className="font-medium text-sm mb-3 text-center">{MONTHS[mOffset]} {yOffset}</h3>
           {/* Day headers */}
           <div className="grid grid-cols-7 mb-2">
             {DAYS.map(d => (
-              <div key={d} className="text-center text-xs font-medium text-muted-foreground py-2">{d}</div>
+              <div key={d} className="text-center text-xs font-medium text-muted-foreground py-1">{d}</div>
             ))}
           </div>
 
           {/* Days grid */}
-          {loading ? <Skeleton className="h-64 w-full" /> : (
-            <div className="grid grid-cols-7 gap-1">
-              {/* Empty cells for first day */}
-              {Array.from({ length: firstDay }).map((_, i) => <div key={`empty-${i}`} />)}
-
-              {/* Day cells */}
-              {Array.from({ length: daysInMonth }, (_, i) => i + 1).map(day => {
+          {loading ? <Skeleton className="h-48 w-full" /> : (
+            <div className="grid grid-cols-7 gap-0.5">
+              {Array.from({ length: firstD }).map((_, i) => <div key={`empty-${i}`} />)}
+              {Array.from({ length: daysInM }, (_, i) => i + 1).map(day => {
+                const daysInMonth = daysInM; const firstDay = firstD;
                 const dayEvents = getEventsForDay(day);
                 const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
                 const isToday = dateStr === todayStr;
@@ -210,6 +217,10 @@ export default function CalendarPage() {
               })}
             </div>
           )}
+            </div>
+            );
+          })}
+          </div>
 
           {/* Selected day events */}
           {selectedDay && (
