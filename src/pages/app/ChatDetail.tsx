@@ -164,6 +164,30 @@ const ChatDetail = () => {
   const [health, setHealth] = useState<HealthData | null>(null);
   const [sideLoading, setSideLoading] = useState(false);
 
+  const fetchMessages = async () => {
+    if (!id) return;
+    try {
+      const res = await apiFetch(`/api/chats/${encodeURIComponent(id!)}/messages`);
+      if (!res.ok) return;
+      const mj: any = await res.json();
+      const raw2 = Array.isArray(mj) ? mj : (mj?.messages ?? []);
+      const msgs = raw2.map((m: any) => ({
+        id: String(m.id ?? crypto.randomUUID()),
+        author: m.senderName ?? m.author ?? "Unknown",
+        text: m.text ?? "",
+        time: m.sentAt ?? m.time ?? "",
+        flagged: false,
+      }));
+      setData(prev => prev ? { ...prev, messages: msgs } : prev);
+    } catch { /* ignore */ }
+  };
+
+  useEffect(() => {
+    if (!id) return;
+    const interval = setInterval(fetchMessages, 30000);
+    return () => clearInterval(interval);
+  }, [id]);
+
   // Load chat + messages
   useEffect(() => {
     if (!id) return;
