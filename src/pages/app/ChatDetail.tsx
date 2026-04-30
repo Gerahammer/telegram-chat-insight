@@ -317,7 +317,7 @@ const ChatDetail = () => {
   const handleAsk = async () => {
     if (!id || !askQuestion.trim() || askLoading) return;
     setAskLoading(true);
-    setAskAnswer(null);
+    
     setAskError(null);
     try {
       const res = await apiFetch(`/api/chats/${encodeURIComponent(id)}/ask`, {
