@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PriorityBadge, StatusBadge, TimeAgo } from "@/components/Badges";
-import { Search, ListTodo } from "lucide-react";
+import { Search, ListTodo, ExternalLink, RotateCcw } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { toast } from "sonner";
 
@@ -42,30 +43,22 @@ const ActionItems = () => {
       apiFetch("/api/action-items").catch(() => null),
       apiFetch("/api/chats").catch(() => null),
     ]);
-
     if (itemsRes?.ok) {
       try {
         const data = await itemsRes.json();
-        // API returns { actionItems: [...] }
-        const list = Array.isArray(data) ? data : (data?.actionItems ?? data?.items ?? []);
-        setItems(list);
+        setItems(Array.isArray(data) ? data : (data?.actionItems ?? data?.items ?? []));
       } catch { setItems([]); }
     }
-
     if (chatsRes?.ok) {
       try {
         const data = await chatsRes.json();
-        const list = Array.isArray(data) ? data : (data?.chats ?? data?.items ?? []);
-        setChats(list);
+        setChats(Array.isArray(data) ? data : (data?.chats ?? []));
       } catch { setChats([]); }
     }
   };
 
   useEffect(() => {
-    (async () => {
-      await fetchItems();
-      setLoading(false);
-    })();
+    (async () => { await fetchItems(); setLoading(false); })();
   }, []);
 
   const updateStatus = async (id: string, newStatus: string) => {
@@ -76,9 +69,7 @@ const ActionItems = () => {
         body: JSON.stringify({ status: newStatus }),
       });
       if (!res.ok) throw new Error("Failed to update");
-      setItems(prev => prev.map(item =>
-        item.id === id ? { ...item, status: newStatus } : item
-      ));
+      setItems(prev => prev.map(item => item.id === id ? { ...item, status: newStatus } : item));
       toast.success(`Marked as ${newStatus.toLowerCase().replace("_", " ")}`);
     } catch {
       toast.error("Failed to update action item");
@@ -89,19 +80,21 @@ const ActionItems = () => {
 
   const list = items.filter((a) => {
     if (q && !a.title?.toLowerCase().includes(q.toLowerCase())) return false;
-    // Normalize to lowercase for comparison
     if (priority !== "all" && (a.priority ?? "").toLowerCase() !== priority) return false;
     if (status !== "all" && (a.status ?? "").toLowerCase() !== status) return false;
     if (chatFilter !== "all" && a.summary?.chat?.id !== chatFilter) return false;
     return true;
   });
 
+  const openCount = items.filter(i => (i.status ?? "").toLowerCase() === "open").length;
+  const inProgressCount = items.filter(i => (i.status ?? "").toLowerCase() === "in_progress").length;
+
   return (
     <div className="space-y-6 max-w-[1400px] mx-auto">
       <div>
         <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Action items</h1>
         <p className="text-muted-foreground mt-1">
-          {loading ? "Loading…" : `${items.length} total · ${items.filter(i => (i.status ?? "").toLowerCase() === "open").length} open`}
+          {loading ? "Loading…" : `${openCount} open · ${inProgressCount} in progress · ${items.length} total`}
         </p>
       </div>
 
@@ -153,6 +146,9 @@ const ActionItems = () => {
             const statusLower = (a.status ?? "open").toLowerCase();
             const isResolved = statusLower === "resolved" || statusLower === "dismissed";
             const isInProgress = statusLower === "in_progress";
+            const chatId = a.summary?.chat?.id;
+            const chatTitle = a.summary?.chat?.title;
+
             return (
               <Card key={a.id} className={`p-5 hover:shadow-md transition ${isResolved ? "opacity-60" : ""}`}>
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -164,33 +160,71 @@ const ActionItems = () => {
                     </div>
                     {a.description && <p className="text-sm text-muted-foreground mt-1.5">{a.description}</p>}
                     <div className="flex items-center gap-3 mt-3 text-xs text-muted-foreground">
-                      {a.summary?.chat?.title && <span>💬 {a.summary.chat.title}</span>}
+                      {chatId && chatTitle && (
+                        <Link
+                          to={`/app/chats/${chatId}`}
+                          className="flex items-center gap-1 hover:text-primary transition"
+                        >
+                          <ExternalLink className="h-3 w-3" />
+                          {chatTitle}
+                        </Link>
+                      )}
                       {a.requestedBy && <span>👤 {a.requestedBy}</span>}
                       {a.createdAt && <TimeAgo iso={a.createdAt} />}
                     </div>
                   </div>
-                  {!isResolved && (
-                    <div className="flex gap-2">
-                      {!isInProgress && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          disabled={updating === a.id}
-                          onClick={() => updateStatus(a.id, "IN_PROGRESS")}
-                        >
-                          In progress
-                        </Button>
-                      )}
+
+                  <div className="flex gap-2 flex-wrap">
+                    {/* Reopen button for resolved/dismissed items */}
+                    {isResolved && (
                       <Button
+                        variant="outline"
                         size="sm"
-                        className="gradient-primary border-0"
                         disabled={updating === a.id}
-                        onClick={() => updateStatus(a.id, "RESOLVED")}
+                        onClick={() => updateStatus(a.id, "OPEN")}
+                        className="gap-1.5"
                       >
-                        Resolve
+                        <RotateCcw className="h-3.5 w-3.5" />
+                        Reopen
                       </Button>
-                    </div>
-                  )}
+                    )}
+
+                    {/* Action buttons for open/in-progress items */}
+                    {!isResolved && (
+                      <>
+                        {!isInProgress && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={updating === a.id}
+                            onClick={() => updateStatus(a.id, "IN_PROGRESS")}
+                          >
+                            In progress
+                          </Button>
+                        )}
+                        {isInProgress && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={updating === a.id}
+                            onClick={() => updateStatus(a.id, "OPEN")}
+                            className="gap-1.5"
+                          >
+                            <RotateCcw className="h-3.5 w-3.5" />
+                            Back to open
+                          </Button>
+                        )}
+                        <Button
+                          size="sm"
+                          className="gradient-primary border-0"
+                          disabled={updating === a.id}
+                          onClick={() => updateStatus(a.id, "RESOLVED")}
+                        >
+                          Resolve
+                        </Button>
+                      </>
+                    )}
+                  </div>
                 </div>
               </Card>
             );
