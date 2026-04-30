@@ -165,6 +165,7 @@ const ChatDetail = () => {
   const [health, setHealth] = useState<HealthData | null>(null);
   const [sideLoading, setSideLoading] = useState(false);
   const [askQuestion, setAskQuestion] = useState("");
+  const [summaryTab, setSummaryTab] = useState<"overall" | "users">("overall");
   const [askHistory, setAskHistory] = useState<{question: string; answer: string}[]>(() => {
     try {
       const saved = localStorage.getItem(`askHistory-${id}`);
