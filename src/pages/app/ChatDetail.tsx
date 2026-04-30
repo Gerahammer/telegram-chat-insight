@@ -323,7 +323,7 @@ const ChatDetail = () => {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex items-center gap-4">
             {(chat as any).photoUrl ? (
-              <img src={(chat as any).photoUrl} alt={chat.name} className="h-12 w-12 rounded-lg object-cover shadow-glow" />
+              <img src={`https://seahorse-app-47666.ondigitalocean.app/api/proxy/image?url=${encodeURIComponent((chat as any).photoUrl)}`} alt={chat.name} className="h-12 w-12 rounded-lg object-cover shadow-glow" />
             ) : (
               <div className="h-12 w-12 rounded-lg gradient-primary flex items-center justify-center shadow-glow">
                 <Hash className="h-6 w-6 text-primary-foreground" />
