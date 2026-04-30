@@ -130,7 +130,7 @@ const Dashboard = () => {
   const avgHealth = stats?.avgHealthScore ?? 100;
 
   const chartData = (stats?.chartData ?? []).map(d => ({
-    day: new Date(d.date).toLocaleDateString(undefined, { weekday: "short" }),
+    day: new Date(d.date).toLocaleDateString("en-GB", { weekday: "short" }),
     messages: d.count,
   }));
 

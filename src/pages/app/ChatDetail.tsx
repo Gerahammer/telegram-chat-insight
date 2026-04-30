@@ -60,9 +60,9 @@ function formatDisplay(from: string, to: string) {
   if (from === to) {
     if (from === today()) return "Today";
     if (from === daysAgo(1)) return "Yesterday";
-    return new Date(from).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    return new Date(from).toLocaleDateString("en-GB", { month: "short", day: "numeric" });
   }
-  return `${new Date(from).toLocaleDateString(undefined, { month: "short", day: "numeric" })} – ${new Date(to).toLocaleDateString(undefined, { month: "short", day: "numeric" })}`;
+  return `${new Date(from).toLocaleDateString("en-GB", { month: "short", day: "numeric" })} – ${new Date(to).toLocaleDateString("en-GB", { month: "short", day: "numeric" })}`;
 }
 const PRESETS = [
   { label: "Today",        from: today,          to: today },
@@ -245,7 +245,7 @@ const ChatDetail = () => {
         if (!res.ok) { if (!cancelled) setData(p => p ? { ...p, summaries: [] } : p); return; }
         const json: any = await res.json();
         const all: SummaryData[] = Array.isArray(json) ? json : (json?.summaries ?? []);
-        const filtered = all.filter(s => { const d = s.date?.slice(0, 10) ?? ""; return d >= dateFrom && d <= dateTo; });
+        const filtered = all.filter(s => { const d = (s.date ? new Date(s.date).toLocaleDateString("en-GB") : "") ?? ""; return d >= dateFrom && d <= dateTo; });
         if (!cancelled) setData(p => p ? { ...p, summaries: filtered } : p);
       } catch { if (!cancelled) setData(p => p ? { ...p, summaries: [] } : p); }
       finally { if (!cancelled) setSummaryLoading(false); }
@@ -427,7 +427,7 @@ const ChatDetail = () => {
                       <div key={s.id} className="p-3 rounded-lg border border-primary/10 bg-background/50">
                         <div className="flex items-center justify-between mb-1">
                           <span className="text-xs font-medium text-muted-foreground">
-                            {s.date ? new Date(s.date).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" }) : ""}
+                            {s.date ? new Date(s.date).toLocaleDateString("en-GB", { weekday: "short", month: "short", day: "numeric" }) : ""}
                           </span>
                           {s.sentiment && <SentimentBadge sentiment={s.sentiment as any} />}
                         </div>
@@ -613,7 +613,7 @@ const ChatDetail = () => {
                         <p className="text-xs mt-0.5 line-clamp-2">{c.commitment}</p>
                         {c.dueDate && (
                           <p className={`text-xs mt-0.5 ${c.status === "OVERDUE" ? "text-destructive" : "text-muted-foreground"}`}>
-                            Due {new Date(c.dueDate).toLocaleDateString()}
+                            Due {new Date(c.dueDate).toLocaleDateString("en-GB")}
                           </p>
                         )}
                       </div>
@@ -664,7 +664,7 @@ const ChatDetail = () => {
                             <Badge variant="outline" className={`text-xs shrink-0 ${cfg.cls}`}>{cfg.label}</Badge>
                           </div>
                           {event.dueDate && (
-                            <p className="text-xs text-warning mt-0.5">Due {new Date(event.dueDate).toLocaleDateString()}</p>
+                            <p className="text-xs text-warning mt-0.5">Due {new Date(event.dueDate).toLocaleDateString("en-GB")}</p>
                           )}
                         </div>
                       </div>

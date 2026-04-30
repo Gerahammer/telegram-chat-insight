@@ -194,7 +194,7 @@ const SearchPage = () => {
                         <div className="flex items-center gap-2">
                           <SentimentBadge sentiment={s.sentiment} />
                           <span className="text-xs text-muted-foreground">
-                            {new Date(s.date).toLocaleDateString()}
+                            {new Date(s.date).toLocaleDateString("en-GB")}
                           </span>
                         </div>
                       </div>

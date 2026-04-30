@@ -198,7 +198,7 @@ const Commitments = () => {
                     )}
                     {c.dueDate && (
                       <span className={c.status === "OVERDUE" ? "text-destructive font-medium" : ""}>
-                        Due: {new Date(c.dueDate).toLocaleDateString()}
+                        Due: {new Date(c.dueDate).toLocaleDateString("en-GB")}
                       </span>
                     )}
                     <TimeAgo iso={c.createdAt} />
