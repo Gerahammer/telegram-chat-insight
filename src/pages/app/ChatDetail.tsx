@@ -296,6 +296,16 @@ const ChatDetail = () => {
       }
       setDateFrom(today()); setDateTo(today());
       setData(p => p ? { ...p, personalHighlights: body?.personalHighlights ?? [] } : p);
+      // Reload summaries from API to get clean saved data (no temp AI output)
+      apiFetch(`/api/chats/${encodeURIComponent(id)}/summaries?limit=60`)
+        .then(r => r.ok ? r.json() : null)
+        .then(json => {
+          if (!json) return;
+          const all = Array.isArray(json) ? json : (json?.summaries ?? []);
+          const t = today();
+          const filtered = all.filter((s: any) => s.date?.slice(0, 10) === t);
+          setData(p => p ? { ...p, summaries: filtered } : p);
+        }).catch(() => {});
       // Reload side data
       Promise.all([
         apiFetch(`/api/chats/${encodeURIComponent(id)}/timeline`).then(r => r.ok ? r.json() : null),
