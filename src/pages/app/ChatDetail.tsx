@@ -332,7 +332,9 @@ const ChatDetail = () => {
   const summaries = data.summaries ?? [];
   const personalHighlights = data.personalHighlights ?? [];
   const allActions = summaries.flatMap(s => s.actionItems ?? []);
-  const allUnanswered = summaries.flatMap(s => s.unansweredQuestions ?? []);
+  const allUnanswered = summaries.flatMap(s =>
+    (s.unansweredQuestions ?? []).map((q, i) => ({ q, summaryId: s.id, index: i }))
+  );
   const isMultiDay = dateFrom !== dateTo;
   const healthCfg = HC[(chat as any).healthLabel ?? "HEALTHY"];
   const HealthIcon = healthCfg.icon;
