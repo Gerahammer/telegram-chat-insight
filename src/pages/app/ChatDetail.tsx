@@ -709,9 +709,18 @@ const ChatDetail = () => {
                                 <div className="flex items-center gap-2 mb-1">
                                   <span className="text-xs text-muted-foreground">🎤 Voice</span>
                                   {proxyAudio && (
-                                    <audio controls className="h-7" style={{maxWidth: "200px"}}>
-                                      <source src={proxyAudio} type="audio/ogg" />
-                                    </audio>
+                                    <button
+                                      onClick={() => {
+                                        const audio = new Audio(proxyAudio);
+                                        audio.play().catch(() => {});
+                                      }}
+                                      className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary/10 hover:bg-primary/20 text-primary text-xs transition"
+                                    >
+                                      <svg className="h-3 w-3" viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M8 5v14l11-7z"/>
+                                      </svg>
+                                      Play
+                                    </button>
                                   )}
                                 </div>
                                 <p className="text-sm">{summary}</p>
