@@ -531,11 +531,28 @@ const ChatDetail = () => {
               <div className="space-y-2">
                 {allActions.length === 0
                   ? <p className="text-sm text-muted-foreground">No action items for this period.</p>
-                  : allActions.map((a: any, i: number) => (
-                    <div key={a.id ?? i} className="p-3 rounded-lg border border-border">
+                  : allActions.map((a: any, i: number) => {
+                    const isResolved = ["resolved","dismissed"].includes((a.status ?? "").toLowerCase());
+                    return (
+                    <div key={a.id ?? i} className={`p-3 rounded-lg border border-border ${isResolved ? "opacity-50" : ""}`}>
                       <div className="flex items-start justify-between gap-2">
                         <div className="font-medium text-sm">{a.title}</div>
-                        {a.priority && <PriorityBadge priority={a.priority} />}
+                        <div className="flex items-center gap-1">
+                          {a.priority && <PriorityBadge priority={a.priority} />}
+                          {!isResolved && a.id && (
+                            <button
+                              onClick={async () => {
+                                try {
+                                  const res = await apiFetch(`/api/action-items/${a.id}`, {method:"PATCH", body: JSON.stringify({status:"RESOLVED"})});
+                                  if (res.ok) setData(p => p ? {...p, summaries: p.summaries?.map(s => ({...s, actionItems: s.actionItems?.map((ai: any) => ai.id === a.id ? {...ai, status: "RESOLVED"} : ai)}))} : p);
+                                } catch {}
+                              }}
+                              className="text-xs text-muted-foreground hover:text-success transition px-1.5 py-0.5 rounded border border-border hover:border-success"
+                            >
+                              ✓
+                            </button>
+                          )}
+                        </div>
                       </div>
                       {a.description && <p className="text-xs text-muted-foreground mt-1">{a.description}</p>}
                       <div className="mt-2 flex items-center gap-2">
@@ -543,7 +560,8 @@ const ChatDetail = () => {
                         {a.requestedBy && <span className="text-xs text-muted-foreground">by {a.requestedBy}</span>}
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
               </div>
             </Card>
 
@@ -672,10 +690,21 @@ const ChatDetail = () => {
                         {(() => {
                           const txt = m.text ?? "";
                           if (txt.startsWith("[Voice]")) {
+                            const summary = txt.replace("[Voice]", "").trim();
+                            const proxyAudio = (m as any).audioUrl
+                              ? `https://seahorse-app-47666.ondigitalocean.app/api/proxy/audio?url=${encodeURIComponent((m as any).audioUrl)}`
+                              : null;
                             return (
                               <div className="mt-0.5">
-                                <span className="text-xs text-muted-foreground">🎤 Voice</span>
-                                <p className="text-sm">{txt.replace("[Voice]", "").trim()}</p>
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className="text-xs text-muted-foreground">🎤 Voice</span>
+                                  {proxyAudio && (
+                                    <audio controls className="h-7" style={{maxWidth: "200px"}}>
+                                      <source src={proxyAudio} type="audio/ogg" />
+                                    </audio>
+                                  )}
+                                </div>
+                                <p className="text-sm">{summary}</p>
                               </div>
                             );
                           }
