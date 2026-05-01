@@ -280,11 +280,11 @@ const ChatDetail = () => {
     }).catch(() => {}).finally(() => setSideLoading(false));
   }, [id, data?.chat]);
 
-  const handleGenerate = async () => {
+  const handleGenerate = async (force = false) => {
     if (!id || generating) return;
     setGenerating(true);
     try {
-      const res = await apiFetch(`/api/chats/${encodeURIComponent(id)}/generate-summary`, { method: "POST" });
+      const res = await apiFetch(`/api/chats/${encodeURIComponent(id)}/generate-summary${force ? "?force=true" : ""}`, { method: "POST" });
       let body: any = null;
       try { const t = await res.text(); body = t ? JSON.parse(t) : null; } catch {}
       if (!res.ok) {
@@ -452,7 +452,7 @@ const ChatDetail = () => {
                   <h2 className="font-semibold">AI Summary</h2>
                   <div className="flex items-center gap-2">
                     <DateRangePicker from={dateFrom} to={dateTo} onChange={(f, t) => { setDateFrom(f); setDateTo(t); }} />
-                    <Button size="sm" variant="outline" onClick={handleGenerate} disabled={generating} className="h-8">
+                    <Button size="sm" variant="outline" onClick={() => handleGenerate()} disabled={generating} className="h-8">
                       {generating ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5 mr-1.5" />}
                       {generating ? "Generating..." : "Generate now"}
                     </Button>
