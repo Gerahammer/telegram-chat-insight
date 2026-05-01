@@ -166,7 +166,7 @@ const ChatDetail = () => {
   const [sideLoading, setSideLoading] = useState(false);
   const [askQuestion, setAskQuestion] = useState("");
   const [summaryTab, setSummaryTab] = useState<"overall" | "users">("overall");
-  const [askHistory, setAskHistory] = useState<{question: string; answer: string}[]>(() => {
+  const [askHistory, setAskHistory] = useState<{question: string; answer: string; askedAt?: string}[]>(() => {
     try {
       const saved = localStorage.getItem(`askHistory-${id}`);
       return saved ? JSON.parse(saved) : [];
@@ -346,7 +346,7 @@ const ChatDetail = () => {
         setAskError(data.message ?? data.error ?? "Failed");
       } else {
         setAskHistory(prev => {
-          const next = [{question: askQuestion, answer: data.answer}, ...prev].slice(0, 5);
+          const next = [{question: askQuestion, answer: data.answer, askedAt: new Date().toISOString()}, ...prev].slice(0, 5);
           try { localStorage.setItem(`askHistory-${id}`, JSON.stringify(next)); } catch {}
           return next;
         });
@@ -615,7 +615,7 @@ const ChatDetail = () => {
                   >
                     {askHistory.map((item, i) => (
                       <div key={i} className="min-w-full p-3">
-                        <p className="text-xs font-medium text-muted-foreground mb-1">Q: {item.question}</p>
+                        <div className="flex items-center justify-between mb-1"><p className="text-xs font-medium text-muted-foreground">Q: {item.question}</p>{item.askedAt && <span className="text-xs text-muted-foreground shrink-0 ml-2">{new Date(item.askedAt).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})}</span>}</div>
                         <p className="text-sm leading-relaxed">{item.answer}</p>
                       </div>
                     ))}
