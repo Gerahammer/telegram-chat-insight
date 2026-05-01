@@ -724,7 +724,6 @@ const ChatDetail = () => {
                                       Play
                                     </button>
                                   )}
-                                  )}
                                 </div>
                                 <p className="text-sm">{summary}</p>
                               </div>
