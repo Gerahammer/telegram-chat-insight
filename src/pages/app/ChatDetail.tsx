@@ -717,6 +717,10 @@ const ChatDetail = () => {
                               </div>
                             );
                           }
+                          if (txt.startsWith("[File]")) return <p className="text-sm mt-0.5 text-muted-foreground">📎 {txt.replace("[File]", "").trim()}</p>;
+                          if (txt.startsWith("[Image]")) return <p className="text-sm mt-0.5 text-muted-foreground">🖼️ {txt.replace("[Image]", "").trim()}</p>;
+                          if (txt.startsWith("[Video]")) return <p className="text-sm mt-0.5 text-muted-foreground">🎥 {txt.replace("[Video]", "").trim()}</p>;
+                          if (txt.startsWith("[Sticker]")) return <p className="text-sm mt-0.5">{txt.replace("[Sticker]", "").trim()}</p>;
                           return <p className="text-sm mt-0.5">{txt}</p>;
                         })()}
                       </div>
