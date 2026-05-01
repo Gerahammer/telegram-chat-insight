@@ -231,6 +231,37 @@ const Settings = () => {
                 </SelectContent>
               </Select>
             </div>
+            <div className="space-y-2">
+              <Label>Auto-summary interval</Label>
+              <Select
+                value={String(settings.autoSummaryIntervalMin ?? "30")}
+                onValueChange={(v) => setSettings((s: any) => ({ ...s, autoSummaryIntervalMin: parseInt(v) }))}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="15">Every 15 minutes</SelectItem>
+                  <SelectItem value="30">Every 30 minutes</SelectItem>
+                  <SelectItem value="60">Every hour</SelectItem>
+                  <SelectItem value="120">Every 2 hours</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">How often to check for new messages</p>
+            </div>
+            <div className="space-y-2">
+              <Label>Minimum messages to trigger summary</Label>
+              <Select
+                value={String(settings.minMessagesForSummary ?? "3")}
+                onValueChange={(v) => setSettings((s: any) => ({ ...s, minMessagesForSummary: parseInt(v) }))}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">1 message</SelectItem>
+                  <SelectItem value="3">3 messages</SelectItem>
+                  <SelectItem value="5">5 messages</SelectItem>
+                  <SelectItem value="10">10 messages</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <div className="flex items-start justify-between gap-4 py-2">
               <div>
                 <Label>Email notifications</Label>
@@ -238,7 +269,7 @@ const Settings = () => {
               </div>
               <Switch
                 checked={settings.notifyEmail ?? true}
-                onCheckedChange={(v) => setSettings(s => ({ ...s, notifyEmail: v }))}
+                onCheckedChange={(v) => setSettings((s: any) => ({ ...s, notifyEmail: v }))}
               />
             </div>
             <Button className="gradient-primary border-0" onClick={handleSaveSettings} disabled={saving}>
