@@ -646,12 +646,17 @@ const ChatDetail = () => {
               </div>
             ) : (
               <div className="space-y-3 max-h-[400px] overflow-y-auto pr-1">
-                {messages.map(m => {
+                {messages.reduce((acc: any[], m, i) => {
+                  const msgDate = m.time ? new Date(m.time).toLocaleDateString("en-GB") : "";
+                  const prevDate = i > 0 && messages[i-1].time ? new Date(messages[i-1].time).toLocaleDateString("en-GB") : "";
+                  if (msgDate !== prevDate) {
+                    acc.push(<div key={"sep"+i} className="flex items-center gap-2 my-1"><div className="flex-1 h-px bg-border"/><span className="text-xs text-muted-foreground shrink-0 px-2">{msgDate}</span><div className="flex-1 h-px bg-border"/></div>);
+                  }
                   const text = m.text ?? "";
                   const isQ = text.includes("?");
                   const isCom = /\b(i will|i'll|will do|tomorrow|by monday|by tuesday|by friday|by \d)\b/i.test(text);
                   const isUnans = allUnanswered.some(u => u.q && text.toLowerCase().startsWith(u.q.toLowerCase().slice(0, 25)));
-                  return (
+                  acc.push(
                     <div key={m.id} className="flex gap-3">
                       <UserAvatar name={m.author} size="md" />
                       <div className="flex-1 min-w-0">
@@ -668,7 +673,8 @@ const ChatDetail = () => {
                       </div>
                     </div>
                   );
-                })}
+                  return acc;
+                }, [])}
               </div>
             )}
           </Card>
