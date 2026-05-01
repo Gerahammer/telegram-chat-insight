@@ -669,7 +669,18 @@ const ChatDetail = () => {
                           {isCom && !isUnans && <span className="px-1.5 py-0.5 rounded-full bg-blue-500/10 text-blue-500 text-xs">Commitment</span>}
                           {isQ && !isUnans && !isCom && <span className="px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground text-xs">Question</span>}
                         </div>
-                        <p className="text-sm mt-0.5">{m.text}</p>
+                        {(() => {
+                          const txt = m.text ?? "";
+                          if (txt.startsWith("[Voice]")) {
+                            return (
+                              <div className="mt-0.5">
+                                <span className="text-xs text-muted-foreground">🎤 Voice</span>
+                                <p className="text-sm">{txt.replace("[Voice]", "").trim()}</p>
+                              </div>
+                            );
+                          }
+                          return <p className="text-sm mt-0.5">{txt}</p>;
+                        })()}
                       </div>
                     </div>
                   );
