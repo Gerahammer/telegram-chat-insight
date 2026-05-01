@@ -713,9 +713,9 @@ const ChatDetail = () => {
                                       onClick={() => {
                                         if (playingId === m.id) {
                                           // Stop current
-                                          playingAudio?.pause();
-                                          playingAudio && (playingAudio.currentTime = 0);
-                                          setPlayingAudio(null);
+                                          playingAudioRef.current?.pause();
+                                          if (playingAudioRef.current) playingAudioRef.current.currentTime = 0;
+                                          playingAudioRef.current = null;
                                           setPlayingId(null);
                                         } else {
                                           // Stop previous
@@ -724,8 +724,8 @@ const ChatDetail = () => {
                                           // Play new
                                           const audio = new Audio(proxyAudio);
                                           audio.play().catch(() => {});
-                                          audio.onended = () => { setPlayingAudio(null); setPlayingId(null); };
-                                          setPlayingAudio(audio);
+                                          audio.onended = () => { playingAudioRef.current = null; setPlayingId(null); };
+                                          playingAudioRef.current = audio;
                                           setPlayingId(m.id);
                                         }
                                       }}
