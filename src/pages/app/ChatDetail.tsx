@@ -711,15 +711,32 @@ const ChatDetail = () => {
                                   {proxyAudio && (
                                     <button
                                       onClick={() => {
-                                        const audio = new Audio(proxyAudio);
-                                        audio.play().catch(() => {});
+                                        if (playingId === m.id) {
+                                          // Stop current
+                                          playingAudio?.pause();
+                                          playingAudio && (playingAudio.currentTime = 0);
+                                          setPlayingAudio(null);
+                                          setPlayingId(null);
+                                        } else {
+                                          // Stop previous
+                                          playingAudio?.pause();
+                                          playingAudio && (playingAudio.currentTime = 0);
+                                          // Play new
+                                          const audio = new Audio(proxyAudio);
+                                          audio.play().catch(() => {});
+                                          audio.onended = () => { setPlayingAudio(null); setPlayingId(null); };
+                                          setPlayingAudio(audio);
+                                          setPlayingId(m.id);
+                                        }
                                       }}
-                                      className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary/10 hover:bg-primary/20 text-primary text-xs transition"
+                                      className={"flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs transition " + (playingId === m.id ? "bg-primary text-primary-foreground" : "bg-primary/10 hover:bg-primary/20 text-primary")}
                                     >
-                                      <svg className="h-3 w-3" viewBox="0 0 24 24" fill="currentColor">
-                                        <path d="M8 5v14l11-7z"/>
-                                      </svg>
-                                      Play
+                                      {playingId === m.id ? (
+                                        <svg className="h-3 w-3" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+                                      ) : (
+                                        <svg className="h-3 w-3" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                                      )}
+                                      {playingId === m.id ? "Stop" : "Play"}
                                     </button>
                                   )}
                                 </div>
