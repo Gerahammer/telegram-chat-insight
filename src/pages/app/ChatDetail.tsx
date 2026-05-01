@@ -527,11 +527,11 @@ const ChatDetail = () => {
           {/* Action items + Unanswered questions side by side */}
           <div className="grid md:grid-cols-2 gap-4">
             <Card className="p-5">
-              <SectionHeader icon={AlertCircle} title="Action items" count={allActions.length} />
-              <div className="space-y-2">
-                {allActions.length === 0
+              <SectionHeader icon={AlertCircle} title="Action items" count={allActions.filter((a:any) => !["resolved","dismissed"].includes((a.status??"").toLowerCase())).length} />
+              <div className="space-y-2 max-h-[280px] overflow-y-auto pr-1">
+                {allActions.filter((a:any) => !["resolved","dismissed"].includes((a.status??"").toLowerCase())).length === 0
                   ? <p className="text-sm text-muted-foreground">No action items for this period.</p>
-                  : allActions.map((a: any, i: number) => {
+                  : allActions.filter((a:any) => !["resolved","dismissed"].includes((a.status??"").toLowerCase())).slice(0,10).map((a: any, i: number) => {
                     const isResolved = ["resolved","dismissed"].includes((a.status ?? "").toLowerCase());
                     return (
                     <div key={a.id ?? i} className={`p-3 rounded-lg border border-border ${isResolved ? "opacity-50" : ""}`}>
@@ -544,7 +544,16 @@ const ChatDetail = () => {
                               onClick={async () => {
                                 try {
                                   const res = await apiFetch(`/api/action-items/${a.id}`, {method:"PATCH", body: JSON.stringify({status:"RESOLVED"})});
-                                  if (res.ok) setData(p => p ? {...p, summaries: p.summaries?.map(s => ({...s, actionItems: s.actionItems?.map((ai: any) => ai.id === a.id ? {...ai, status: "RESOLVED"} : ai)}))} : p);
+                                  if (res.ok) {
+                                    setData(p => p ? {...p, summaries: p.summaries?.map(s => ({...s, actionItems: s.actionItems?.filter((ai: any) => ai.id !== a.id)}))} : p);
+                                    toast.success("Action item resolved", {
+                                      action: { label: "Undo", onClick: async () => {
+                                        await apiFetch(`/api/action-items/${a.id}`, {method:"PATCH", body: JSON.stringify({status:"OPEN"})});
+                                        setData(p => p ? {...p, summaries: p.summaries?.map(s => ({...s, actionItems: [...(s.actionItems ?? []), {...a, status: "OPEN"}]}))} : p);
+                                      }},
+                                      duration: 300000,
+                                    });
+                                  }
                                 } catch {}
                               }}
                               className="text-xs text-muted-foreground hover:text-success transition px-1.5 py-0.5 rounded border border-border hover:border-success"
@@ -567,7 +576,7 @@ const ChatDetail = () => {
 
             <Card className="p-5">
               <SectionHeader icon={HelpCircle} title="Unanswered" count={allUnanswered.length} />
-              <div className="space-y-2">
+              <div className="space-y-2 max-h-[280px] overflow-y-auto pr-1">
                 {allUnanswered.length === 0
                   ? <p className="text-sm text-muted-foreground">No unanswered questions.</p>
                   : allUnanswered.map((item, i) => (
