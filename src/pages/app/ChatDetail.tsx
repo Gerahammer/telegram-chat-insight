@@ -711,33 +711,19 @@ const ChatDetail = () => {
                                   {proxyAudio && (
                                     <button
                                       onClick={() => {
-                                        if (playingId === m.id) {
-                                          // Stop current
-                                          playingAudioRef.current?.pause();
-                                          if (playingAudioRef.current) playingAudioRef.current.currentTime = 0;
-                                          playingAudioRef.current = null;
-                                          setPlayingId(null);
-                                        } else {
-                                          // Stop previous
-                                          playingAudio?.pause();
-                                          playingAudio && (playingAudio.currentTime = 0);
-                                          // Play new
-                                          const audio = new Audio(proxyAudio);
-                                          audio.play().catch(() => {});
-                                          audio.onended = () => { playingAudioRef.current = null; setPlayingId(null); };
-                                          playingAudioRef.current = audio;
-                                          setPlayingId(m.id);
-                                        }
+                                        playingAudioRef.current?.pause();
+                                        if (playingAudioRef.current) playingAudioRef.current.currentTime = 0;
+                                        const audio = new Audio(proxyAudio);
+                                        audio.play().catch(() => {});
+                                        audio.onended = () => { playingAudioRef.current = null; };
+                                        playingAudioRef.current = audio;
                                       }}
-                                      className={"flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs transition " + (playingId === m.id ? "bg-primary text-primary-foreground" : "bg-primary/10 hover:bg-primary/20 text-primary")}
+                                      className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs transition bg-primary/10 hover:bg-primary/20 text-primary"
                                     >
-                                      {playingId === m.id ? (
-                                        <svg className="h-3 w-3" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
-                                      ) : (
-                                        <svg className="h-3 w-3" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
-                                      )}
-                                      {playingId === m.id ? "Stop" : "Play"}
+                                      <svg className="h-3 w-3" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                                      Play
                                     </button>
+                                  )}
                                   )}
                                 </div>
                                 <p className="text-sm">{summary}</p>
