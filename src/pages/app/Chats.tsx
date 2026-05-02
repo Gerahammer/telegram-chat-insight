@@ -120,7 +120,7 @@ function TagEditor({
               if (e.key === "Enter") { e.preventDefault(); commit(input); }
               if (e.key === "Escape") { setAdding(false); setInput(""); }
             }}
-            onBlur={() => setTimeout(() => { setAdding(false); setInput(""); }, 150)}
+            onBlur={() => setTimeout(() => { if (input.trim()) commit(input); setAdding(false); setInput(""); }, 150)}
             placeholder="tag name…"
             className="text-xs px-2 py-0.5 rounded-full border border-primary/40 bg-background focus:outline-none focus:border-primary w-24 transition"
           />
