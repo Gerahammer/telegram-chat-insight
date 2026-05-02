@@ -1290,12 +1290,27 @@ const ChatDetail = () => {
                           </p>
                         )}
                       </div>
-                      {(c.status === "OPEN" || c.status === "OVERDUE") && (
-                        <Button size="sm" variant="ghost" className="h-6 w-6 p-0 shrink-0" onClick={(e) => { e.stopPropagation(); markCommitmentDone(c.id); }}>
-                          <CheckCircle2 className="h-4 w-4 text-muted-foreground hover:text-success" />
-                        </Button>
-                      )}
-                      {c.status === "COMPLETED" && <CheckCircle2 className="h-4 w-4 text-success shrink-0" />}
+                      <div className="flex items-center gap-0.5 shrink-0">
+                        {(c.status === "OPEN" || c.status === "OVERDUE") && (
+                          <Button size="sm" variant="ghost" className="h-6 w-6 p-0" title="Mark done" onClick={(e) => { e.stopPropagation(); markCommitmentDone(c.id); }}>
+                            <CheckCircle2 className="h-4 w-4 text-muted-foreground hover:text-success" />
+                          </Button>
+                        )}
+                        {c.status === "COMPLETED" && <CheckCircle2 className="h-4 w-4 text-success" />}
+                        {c.status !== "CANCELLED" && (
+                          <Button size="sm" variant="ghost" className="h-6 w-6 p-0" title="Not a commitment — teach the AI"
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              const res = await apiFetch(`/api/chats/${encodeURIComponent(id!)}/commitments/${c.id}/feedback`, { method: "POST" });
+                              if (res.ok) {
+                                setCommitments(prev => prev.filter(x => x.id !== c.id));
+                                toast.success("Feedback saved — the AI will avoid this in future summaries");
+                              }
+                            }}>
+                            <ThumbsDown className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -1390,7 +1405,23 @@ const ChatDetail = () => {
                                 <p className="text-xs text-muted-foreground mt-0.5">{event.people.join(", ")}</p>
                               )}
                             </div>
-                            <Badge variant="outline" className={`text-xs shrink-0 ${cfg.cls}`}>{cfg.label}</Badge>
+                            <div className="flex items-center gap-1 shrink-0">
+                              <Badge variant="outline" className={`text-xs ${cfg.cls}`}>{cfg.label}</Badge>
+                              <button
+                                title="Not a timeline event — teach the AI"
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  const res = await apiFetch(`/api/chats/${encodeURIComponent(id!)}/timeline/${event.id}/feedback`, { method: "POST" });
+                                  if (res.ok) {
+                                    setTimeline(prev => prev.filter(x => x.id !== event.id));
+                                    toast.success("Feedback saved — the AI will avoid this in future summaries");
+                                  }
+                                }}
+                                className="opacity-0 group-hover:opacity-100 transition h-5 w-5 rounded flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                              >
+                                <ThumbsDown className="h-3 w-3" />
+                              </button>
+                            </div>
                           </div>
                           {event.dueDate && (
                             <p className="text-xs text-warning mt-0.5">Due {new Date(event.dueDate).toLocaleDateString("en-GB")}</p>
