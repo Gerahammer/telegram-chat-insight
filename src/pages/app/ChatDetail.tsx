@@ -176,6 +176,8 @@ const ChatDetail = () => {
   const [askLoading, setAskLoading] = useState(false);
   const [askRemaining, setAskRemaining] = useState<number | null>(null);
   const [askError, setAskError] = useState<string | null>(null);
+  const [playingMsgId, setPlayingMsgId] = useState<string | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const fetchMessages = async () => {
     if (!id) return;
@@ -712,17 +714,24 @@ const ChatDetail = () => {
                                   {proxyAudio && (
                                     <button
                                       onClick={() => {
-                                        const w = window as any;
-                                        if (w.__rrAudio) { w.__rrAudio.pause(); w.__rrAudio = null; }
-                                        const audio = new Audio(proxyAudio);
-                                        audio.play().catch(() => {});
-                                        audio.onended = () => { w.__rrAudio = null; };
-                                        w.__rrAudio = audio;
+                                        if (playingMsgId === m.id) {
+                                          audioRef.current?.pause();
+                                          setPlayingMsgId(null);
+                                        } else {
+                                          if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
+                                          const audio = new Audio(proxyAudio);
+                                          audio.play().catch(() => {});
+                                          audio.onended = () => setPlayingMsgId(null);
+                                          audioRef.current = audio;
+                                          setPlayingMsgId(m.id);
+                                        }
                                       }}
                                       className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs transition bg-primary/10 hover:bg-primary/20 text-primary"
                                     >
-                                      <svg className="h-3 w-3" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
-                                      Play
+                                      {playingMsgId === m.id
+                                        ? <><svg className="h-3 w-3" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg> Pause</>
+                                        : <><svg className="h-3 w-3" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg> Play</>
+                                      }
                                     </button>
                                   )}
                                 </div>
