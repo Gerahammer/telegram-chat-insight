@@ -154,35 +154,61 @@ function SectionHeader({ icon: Icon, title, count, action }: { icon: any; title:
 interface MsgContextQuery { text?: string; person?: string; time?: string; }
 interface ScoredMessage { m: Message; highlighted: boolean; }
 
+const STOP_WORDS = new Set([
+  "that","this","with","from","have","been","they","will","what","when",
+  "where","which","there","their","about","would","could","should","these",
+  "those","other","after","before","during","while","also","just","then",
+  "than","into","over","some","such","more","most","only","even","back",
+  "same","each","both","down","well","long","good","much","between",
+  "through","against","made","make","said","need","want","know","like",
+  "come","take","time","year","week","work","done","going","please","here",
+]);
+
 function findRelatedMessages(messages: Message[], query: MsgContextQuery): ScoredMessage[] {
+  if (!messages.length) return [];
+
   const scores = messages.map((m, idx) => {
     let score = 0;
+    const msgText = m.text.toLowerCase();
+
     if (query.person) {
-      const p = query.person.toLowerCase();
-      if (m.author.toLowerCase().includes(p) || p.includes(m.author.toLowerCase().split(" ")[0])) score += 4;
+      const nameParts = query.person.toLowerCase().split(/\s+/);
+      const authorLower = m.author.toLowerCase();
+      if (nameParts.some(p => p.length > 2 && authorLower.includes(p))) score += 4;
     }
+
     if (query.text) {
-      const words = query.text.toLowerCase().split(/\s+/).filter(w => w.length > 3);
-      score += words.filter(w => m.text.toLowerCase().includes(w)).length * 2;
+      const queryLower = query.text.toLowerCase();
+      // Exact phrase match for first meaningful chunk
+      const keyPhrase = queryLower.replace(/^[^a-z]+/, "").slice(0, 30);
+      if (keyPhrase.length > 8 && msgText.includes(keyPhrase)) score += 8;
+      // Keyword matching with stop words and length filter
+      const words = queryLower.split(/\s+/).filter(w => w.length > 4 && !STOP_WORDS.has(w) && /^[a-z]/.test(w));
+      score += words.filter(w => msgText.includes(w)).length * 2;
     }
+
     if (query.time && m.time) {
-      const diff = Math.abs(new Date(query.time).getTime() - new Date(m.time).getTime());
-      if (diff < 30 * 60 * 1000) score += 5;
-      else if (diff < 2 * 60 * 60 * 1000) score += 2;
+      const qt = new Date(query.time).getTime();
+      const mt = new Date(m.time).getTime();
+      if (!isNaN(qt) && !isNaN(mt)) {
+        const diff = Math.abs(qt - mt);
+        if (diff < 30 * 60 * 1000) score += 5;
+        else if (diff < 2 * 60 * 60 * 1000) score += 2;
+      }
     }
+
     return { idx, score };
   });
 
-  const matched = scores.filter(x => x.score > 0).sort((a, b) => b.score - a.score).slice(0, 3);
+  // Require minimum score of 3 to qualify as a match
+  const matched = scores.filter(x => x.score >= 3).sort((a, b) => b.score - a.score).slice(0, 5);
   if (matched.length === 0) return [];
 
-  // 1 line of context around each match
+  // Show matched messages + 1 context message before the best match
   const included = new Map<number, boolean>();
-  for (const { idx } of matched) {
-    if (idx > 0) included.set(idx - 1, false);
-    included.set(idx, true);
-    if (idx < messages.length - 1) included.set(idx + 1, false);
-  }
+  for (const { idx } of matched) included.set(idx, true);
+  const bestIdx = matched[0].idx;
+  if (bestIdx > 0 && !included.has(bestIdx - 1)) included.set(bestIdx - 1, false);
 
   return [...included.entries()]
     .sort(([a], [b]) => a - b)
