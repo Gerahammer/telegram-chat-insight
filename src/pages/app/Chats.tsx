@@ -7,7 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { TimeAgo, SentimentBadge } from "@/components/Badges";
 import {
-  Search, Hash, Inbox, RefreshCw, CheckCircle2, Clock,
+  Search, Inbox, RefreshCw, CheckCircle2, Clock,
   MessageSquare, Plus, LayoutGrid, List, AlertTriangle,
 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
@@ -143,8 +143,7 @@ const ChatRow = ({ c }: { c: ApiChat }) => {
   return (
     <Link to={`/app/chats/${encodeURIComponent(c.id)}`} className="block">
       <div className="flex items-center gap-4 p-4 rounded-lg border border-border hover:border-primary/40 hover:bg-secondary/30 transition">
-        {c.photoUrl ? <img src={`${import.meta.env.VITE_API_URL || "https://seahorse-app-47666.ondigitalocean.app"}/api/proxy/image?url=${encodeURIComponent(c.photoUrl)}`} alt={c.title} className="h-9 w-9 rounded-lg object-cover shrink-0" /> : <div className="h-9 w-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0"><Hash className="h-4 w-4" /></div>}
-          <Hash className="h-4 w-4" />
+        <ChatPhoto photoUrl={c.photoUrl} title={c.title} size="sm" />
         {/* Title */}
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">

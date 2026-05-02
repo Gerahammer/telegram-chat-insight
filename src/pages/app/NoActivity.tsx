@@ -4,8 +4,9 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TimeAgo } from "@/components/Badges";
-import { Hash, MoonStar, Bell } from "lucide-react";
+import { MoonStar, Bell } from "lucide-react";
 import { apiFetch } from "@/lib/api";
+import { ChatPhoto } from "@/components/ChatPhoto";
 
 interface ApiChat {
   id: string;
@@ -82,17 +83,7 @@ const NoActivity = () => {
           quiet.map(c => (
             <Card key={c.id} className="p-5 hover:shadow-md transition">
               <div className="flex items-start gap-3">
-                {c.photoUrl ? (
-                  <img
-                    src={`${import.meta.env.VITE_API_URL || "https://seahorse-app-47666.ondigitalocean.app"}/api/proxy/image?url=${encodeURIComponent(c.photoUrl)}`}
-                    alt={c.title}
-                    className="h-10 w-10 rounded-lg object-cover shrink-0"
-                  />
-                ) : (
-                  <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center text-muted-foreground shrink-0">
-                    <Hash className="h-4 w-4" />
-                  </div>
-                )}
+                <ChatPhoto photoUrl={c.photoUrl} title={c.title} size="md" />
                 <div className="flex-1">
                   <div className="flex items-center justify-between">
                     <div className="font-semibold">{c.title}</div>
