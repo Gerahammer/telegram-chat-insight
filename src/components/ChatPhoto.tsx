@@ -17,9 +17,10 @@ export function ChatPhoto({ photoUrl, title = "", size = "md" }: ChatPhotoProps)
   const s = sizes[size];
 
   if (photoUrl) {
+    const param = photoUrl.startsWith("https://") ? `url=${encodeURIComponent(photoUrl)}` : `fileId=${encodeURIComponent(photoUrl)}`;
     return (
       <img
-        src={`${PROXY}?url=${encodeURIComponent(photoUrl)}`}
+        src={`${PROXY}?${param}`}
         alt={title}
         className={`${s} rounded-lg object-cover shrink-0`}
       />
