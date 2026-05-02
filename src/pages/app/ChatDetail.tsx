@@ -711,12 +711,12 @@ const ChatDetail = () => {
                                   {proxyAudio && (
                                     <button
                                       onClick={() => {
-                                        playingAudioRef.current?.pause();
-                                        if (playingAudioRef.current) playingAudioRef.current.currentTime = 0;
+                                        const w = window as any;
+                                        if (w.__rrAudio) { w.__rrAudio.pause(); w.__rrAudio = null; }
                                         const audio = new Audio(proxyAudio);
                                         audio.play().catch(() => {});
-                                        audio.onended = () => { playingAudioRef.current = null; };
-                                        playingAudioRef.current = audio;
+                                        audio.onended = () => { w.__rrAudio = null; };
+                                        w.__rrAudio = audio;
                                       }}
                                       className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs transition bg-primary/10 hover:bg-primary/20 text-primary"
                                     >
