@@ -202,9 +202,9 @@ function findRelatedMessages(messages: Message[], query: MsgContextQuery): Score
     return { idx, keywordScore, score: keywordScore + bonusScore };
   });
 
-  // Must have at least one keyword match to qualify — person/time alone is not enough
+  // Must have at least two keyword matches to qualify — single-word overlap is not enough
   const matched = scores
-    .filter(x => x.keywordScore >= 2)
+    .filter(x => x.keywordScore >= 4)
     .sort((a, b) => b.score - a.score)
     .slice(0, 5);
 
