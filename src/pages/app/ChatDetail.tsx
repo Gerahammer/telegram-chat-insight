@@ -333,6 +333,50 @@ function VoicePlayerBar({ author, preview, playing, currentTime, duration, volum
   );
 }
 
+// ─── File viewer modal ────────────────────────────────────────────────────────
+
+function FileViewer({ msgId, fileName, mimeType, onClose }: { msgId: string; fileName: string; mimeType: string; onClose: () => void }) {
+  const PROXY_BASE = (import.meta.env.VITE_API_URL || "https://seahorse-app-47666.ondigitalocean.app");
+  const src = `${PROXY_BASE}/api/proxy/file/${encodeURIComponent(msgId)}`;
+  const isImage = mimeType.startsWith("image/");
+  const isPdf = mimeType === "application/pdf";
+
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose} role="dialog" aria-modal="true">
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
+      <div className="relative bg-background rounded-2xl shadow-2xl flex flex-col w-full max-w-3xl max-h-[90vh]" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-3 border-b shrink-0">
+          <span className="text-sm font-medium truncate pr-4">{fileName}</span>
+          <div className="flex items-center gap-2 shrink-0">
+            <a href={src} download={fileName} className="text-xs text-primary hover:underline">Download</a>
+            <button onClick={onClose} className="text-muted-foreground hover:text-foreground"><XCircle className="h-5 w-5" /></button>
+          </div>
+        </div>
+        <div className="flex-1 overflow-auto flex items-center justify-center p-4 min-h-0">
+          {isImage ? (
+            <img src={src} alt={fileName} className="max-w-full max-h-full object-contain rounded-lg" />
+          ) : isPdf ? (
+            <iframe src={src} className="w-full h-full min-h-[60vh] rounded-lg border border-border" title={fileName} />
+          ) : (
+            <div className="text-center space-y-3">
+              <p className="text-sm text-muted-foreground">Preview not available for this file type.</p>
+              <a href={src} download={fileName} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm hover:opacity-90 transition">
+                Download {fileName}
+              </a>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 const ChatDetail = () => {
@@ -372,6 +416,7 @@ const ChatDetail = () => {
   const [audioVolume, setAudioVolume] = useState(1);
   const [audioSpeed, setAudioSpeed] = useState(1);
   const [contextModal, setContextModal] = useState<{ title: string; messages: ScoredMessage[] } | null>(null);
+  const [fileViewer, setFileViewer] = useState<{ msgId: string; fileName: string; mimeType: string } | null>(null);
   const [expandedSummaryId, setExpandedSummaryId] = useState<string | null>(null);
   const [reviewItems, setReviewItems] = useState<{ id: string; type: string; content: string; reason?: string }[]>([]);
   const [decidedItems, setDecidedItems] = useState<{ id: string; type: string; content: string; reason?: string; decision: string }[]>([]);
@@ -397,6 +442,11 @@ const ChatDetail = () => {
         time: m.sentAt ?? m.time ?? "",
         audioUrl: m.audioUrl ?? null,
         audioFileId: m.audioFileId ?? null,
+        fileId: m.fileId ?? null,
+        fileName: m.fileName ?? null,
+        fileMimeType: m.fileMimeType ?? null,
+        fileSize: m.fileSize ?? null,
+        hasFileData: m.hasFileData ?? false,
         flagged: false,
       }));
       setData(prev => prev ? { ...prev, messages: msgs } : prev);
@@ -445,6 +495,11 @@ const ChatDetail = () => {
               time: m.sentAt ?? m.time ?? "",
               audioUrl: m.audioUrl ?? null,
               audioFileId: m.audioFileId ?? null,
+              fileId: m.fileId ?? null,
+              fileName: m.fileName ?? null,
+              fileMimeType: m.fileMimeType ?? null,
+              fileSize: m.fileSize ?? null,
+              hasFileData: m.hasFileData ?? false,
               flagged: false,
             }));
           } catch { messages = []; }
@@ -654,6 +709,15 @@ const ChatDetail = () => {
           title={contextModal.title}
           messages={contextModal.messages}
           onClose={() => setContextModal(null)}
+        />
+      )}
+
+      {fileViewer && (
+        <FileViewer
+          msgId={fileViewer.msgId}
+          fileName={fileViewer.fileName}
+          mimeType={fileViewer.mimeType}
+          onClose={() => setFileViewer(null)}
         />
       )}
 
@@ -1135,9 +1199,26 @@ const ChatDetail = () => {
                               </div>
                             );
                           }
-                          if (txt.startsWith("[File]")) return <p className="text-sm mt-0.5 text-muted-foreground">📎 {txt.replace("[File]", "").trim()}</p>;
-                          if (txt.startsWith("[Image]")) return <p className="text-sm mt-0.5 text-muted-foreground">🖼️ {txt.replace("[Image]", "").trim()}</p>;
-                          if (txt.startsWith("[Video]")) return <p className="text-sm mt-0.5 text-muted-foreground">🎥 {txt.replace("[Video]", "").trim()}</p>;
+                          if (txt.startsWith("[File]") || txt.startsWith("[Image]") || txt.startsWith("[Video]")) {
+                            const emoji = txt.startsWith("[File]") ? "📎" : txt.startsWith("[Image]") ? "🖼️" : "🎥";
+                            const label = txt.replace(/^\[(?:File|Image|Video)\]\s*/, "").trim();
+                            const canOpen = (m as any).hasFileData && (m as any).fileMimeType;
+                            return (
+                              <div className="mt-0.5 flex items-center gap-2">
+                                <span className="text-sm text-muted-foreground">{emoji} {label}</span>
+                                {canOpen ? (
+                                  <button
+                                    onClick={() => setFileViewer({ msgId: m.id, fileName: (m as any).fileName ?? label, mimeType: (m as any).fileMimeType })}
+                                    className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition"
+                                  >
+                                    Open
+                                  </button>
+                                ) : label.includes("forwarded to admin") ? (
+                                  <span className="text-xs text-muted-foreground italic">large file — sent to bot</span>
+                                ) : null}
+                              </div>
+                            );
+                          }
                           if (txt.startsWith("[Sticker]")) return <p className="text-sm mt-0.5">{txt.replace("[Sticker]", "").trim()}</p>;
                           return <p className="text-sm mt-0.5">{txt}</p>;
                         })()}
