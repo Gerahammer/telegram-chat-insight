@@ -810,7 +810,13 @@ const ChatDetail = () => {
                           onClick={async () => {
                             await apiFetch(`/api/chats/${id}/review/${item.id}`, { method: "PATCH", body: JSON.stringify({ decision: "confirmed" }) });
                             setReviewItems(p => p.filter(i => i.id !== item.id));
-                            toast.success("Confirmed — AI will remember this");
+                            toast.success("Confirmed — AI will remember this", {
+                              action: { label: "Undo", onClick: async () => {
+                                await apiFetch(`/api/chats/${id}/review/${item.id}`, { method: "PATCH", body: JSON.stringify({ decision: null }) });
+                                setReviewItems(p => [item, ...p]);
+                              }},
+                              duration: 8000,
+                            });
                           }}
                           className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs bg-success/10 text-success hover:bg-success/20 border border-success/20 transition"
                         >
@@ -820,7 +826,13 @@ const ChatDetail = () => {
                           onClick={async () => {
                             await apiFetch(`/api/chats/${id}/review/${item.id}`, { method: "PATCH", body: JSON.stringify({ decision: "rejected" }) });
                             setReviewItems(p => p.filter(i => i.id !== item.id));
-                            toast.success("Rejected — AI will not repeat this");
+                            toast.success("Rejected — AI will not repeat this", {
+                              action: { label: "Undo", onClick: async () => {
+                                await apiFetch(`/api/chats/${id}/review/${item.id}`, { method: "PATCH", body: JSON.stringify({ decision: null }) });
+                                setReviewItems(p => [item, ...p]);
+                              }},
+                              duration: 8000,
+                            });
                           }}
                           className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs bg-destructive/10 text-destructive hover:bg-destructive/20 border border-destructive/20 transition"
                         >
