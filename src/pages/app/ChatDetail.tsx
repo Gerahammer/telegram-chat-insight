@@ -593,19 +593,42 @@ const ChatDetail = () => {
                     {dateFrom === today() && " Click \"Generate now\" to create one."}
                   </p>
                 ) : isMultiDay ? (
-                  <div className="space-y-3">
-                    <p className="text-xs text-muted-foreground">{summaries.length} summaries for {formatDisplay(dateFrom, dateTo)}</p>
-                    {summaries.map(s => (
-                      <div key={s.id} className="p-3 rounded-lg border border-primary/10 bg-background/50">
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-xs font-medium text-muted-foreground">
-                            {s.date ? new Date(s.date).toLocaleDateString("en-GB", { weekday: "short", month: "short", day: "numeric" }) : ""}
-                          </span>
-                          {s.sentiment && <SentimentBadge sentiment={s.sentiment as any} />}
+                  <div className="space-y-2">
+                    <p className="text-xs text-muted-foreground mb-3">{summaries.length} summaries · {formatDisplay(dateFrom, dateTo)}</p>
+                    {summaries.map(s => {
+                      const sentimentBorder = s.sentiment === "positive" ? "border-l-success" : s.sentiment === "negative" ? "border-l-destructive" : "border-l-border";
+                      const dateStr = s.date ? new Date(s.date).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "short" }) : "";
+                      const points = s.noActivity ? [] : (s.summaryText ?? "").split("•").map(p => p.trim()).filter(Boolean);
+                      return (
+                        <div key={s.id} className={`rounded-lg border border-border border-l-4 ${sentimentBorder} ${s.noActivity ? "opacity-50" : "bg-background/50"}`}>
+                          <div className="flex items-center justify-between px-4 py-2.5 border-b border-border/50">
+                            <span className="text-sm font-semibold">{dateStr}</span>
+                            <div className="flex items-center gap-2">
+                              {s.requiresAttention && (
+                                <Badge variant="outline" className="text-warning border-warning/30 bg-warning/10 text-xs gap-1 py-0">
+                                  <AlertCircle className="h-3 w-3" /> Attention
+                                </Badge>
+                              )}
+                              {s.sentiment && !s.noActivity && <SentimentBadge sentiment={s.sentiment as any} />}
+                            </div>
+                          </div>
+                          <div className="px-4 py-3">
+                            {s.noActivity ? (
+                              <p className="text-sm text-muted-foreground italic">No activity recorded.</p>
+                            ) : (
+                              <ul className="space-y-1.5">
+                                {points.map((pt, i) => (
+                                  <li key={i} className="flex gap-2 text-sm leading-relaxed">
+                                    <span className="text-primary shrink-0 mt-0.5">•</span>
+                                    <span>{pt}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                          </div>
                         </div>
-                        <p className="text-sm">{s.noActivity ? "No activity." : (s.summaryText ?? "")}</p>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 ) : (
                   <>
