@@ -189,6 +189,7 @@ const ChatDetail = () => {
         author: m.senderName ?? m.author ?? "Unknown",
         text: m.text ?? "",
         time: m.sentAt ?? m.time ?? "",
+        audioUrl: m.audioUrl ?? null,
         flagged: false,
       }));
       setData(prev => prev ? { ...prev, messages: msgs } : prev);
