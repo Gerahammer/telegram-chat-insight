@@ -681,7 +681,8 @@ const ChatDetail = () => {
                   : allActions.filter((a:any) => !["resolved","dismissed"].includes((a.status??"").toLowerCase())).slice(0,10).map((a: any, i: number) => {
                     const isResolved = ["resolved","dismissed"].includes((a.status ?? "").toLowerCase());
                     return (
-                    <div key={a.id ?? i} className={`p-3 rounded-lg border border-border ${isResolved ? "opacity-50" : ""}`}>
+                    <div key={a.id ?? i} className={`p-3 rounded-lg border border-border cursor-pointer hover:bg-muted/40 transition ${isResolved ? "opacity-50" : ""}`}
+                      onClick={() => openContext(`Action: ${a.title}`, { text: `${a.title} ${a.description ?? ""}`, person: a.requestedBy })}>
                       <div className="flex items-start justify-between gap-2">
                         <div className="font-medium text-sm">{a.title}</div>
                         <div className="flex items-center gap-1">
