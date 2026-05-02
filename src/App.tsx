@@ -22,8 +22,6 @@ import SearchPage from "./pages/app/Search.tsx";
 import Commitments from "./pages/app/Commitments.tsx";
 import CalendarPage from "./pages/app/Calendar.tsx";
 import AdminPanel from "./pages/app/AdminPanel.tsx";
-import CalendarPage from "./pages/app/Calendar.tsx";
-import AdminPanel from "./pages/app/AdminPanel.tsx";
 
 const queryClient = new QueryClient();
 
@@ -50,8 +48,6 @@ const App = () => (
             <Route path="billing" element={<Billing />} />
             <Route path="search" element={<SearchPage />} />
             <Route path="commitments" element={<Commitments />} />
-            <Route path="calendar" element={<CalendarPage />} />
-            <Route path="admin" element={<AdminPanel />} />
             <Route path="calendar" element={<CalendarPage />} />
             <Route path="admin" element={<AdminPanel />} />
           </Route>

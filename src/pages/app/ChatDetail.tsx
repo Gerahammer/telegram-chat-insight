@@ -221,8 +221,14 @@ function findRelatedMessages(messages: Message[], query: MsgContextQuery): Score
 }
 
 function MessageContextModal({ title, messages, onClose }: { title: string; messages: ScoredMessage[]; onClose: () => void }) {
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onClose]);
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose} role="dialog" aria-modal="true">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
       <div className="relative bg-background rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
@@ -386,6 +392,7 @@ const ChatDetail = () => {
         text: m.text ?? "",
         time: m.sentAt ?? m.time ?? "",
         audioUrl: m.audioUrl ?? null,
+        audioFileId: m.audioFileId ?? null,
         flagged: false,
       }));
       setData(prev => prev ? { ...prev, messages: msgs } : prev);
@@ -466,6 +473,7 @@ const ChatDetail = () => {
   // Load timeline + commitments + health + tracker entries in background
   useEffect(() => {
     if (!id || !data?.chat) return;
+    let cancelled = false;
     setSideLoading(true);
     Promise.all([
       apiFetch(`/api/chats/${encodeURIComponent(id)}/timeline`).then(r => r.ok ? r.json() : null),
@@ -474,13 +482,26 @@ const ChatDetail = () => {
       apiFetch(`/api/chats/${encodeURIComponent(id)}/trackers`).then(r => r.ok ? r.json() : null),
       apiFetch(`/api/chats/${encodeURIComponent(id)}/review`).then(r => r.ok ? r.json() : null),
     ]).then(([tl, cm, hl, tr, rv]) => {
+      if (cancelled) return;
       setTimeline(tl?.events ?? []);
       setCommitments(cm?.commitments ?? []);
       setHealth(hl ?? null);
       setTrackerGroups(tr?.trackers ?? []);
       setReviewItems(rv?.items ?? []);
-    }).catch(() => {}).finally(() => setSideLoading(false));
+    }).catch(() => {}).finally(() => { if (!cancelled) setSideLoading(false); });
+    return () => { cancelled = true; };
   }, [id, data?.chat]);
+
+  // Stop audio when chat changes or component unmounts.
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.src = "";
+        audioRef.current = null;
+      }
+    };
+  }, [id]);
 
   const handleGenerate = async (force = false) => {
     if (!id || generating) return;
@@ -1038,8 +1059,10 @@ const ChatDetail = () => {
                           const txt = m.text ?? "";
                           if (txt.startsWith("[Voice]")) {
                             const summary = txt.replace("[Voice]", "").trim();
-                            const proxyAudio = (m as any).audioUrl
-                              ? `https://seahorse-app-47666.ondigitalocean.app/api/proxy/audio?url=${encodeURIComponent((m as any).audioUrl)}`
+                            const PROXY_BASE = (import.meta.env.VITE_API_URL || "https://seahorse-app-47666.ondigitalocean.app");
+                            const audioFileId = (m as any).audioFileId;
+                            const proxyAudio = audioFileId
+                              ? `${PROXY_BASE}/api/proxy/audio?fileId=${encodeURIComponent(audioFileId)}`
                               : null;
                             return (
                               <div className="mt-0.5">

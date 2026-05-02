@@ -72,8 +72,13 @@ function MsgModal({ event, messages, loading, onClose }: {
 }) {
   const cfg = TYPE_CONFIG[event.type] ?? TYPE_CONFIG.deadline;
   const Icon = cfg.icon;
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onClose]);
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose} role="dialog" aria-modal="true">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
       <div className="relative bg-background rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
         <div className="flex items-start justify-between px-5 py-4 border-b shrink-0">
@@ -142,9 +147,10 @@ export default function CalendarPage() {
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth());
   const [selectedDate, setSelectedDate] = useState<string | null>(now.toISOString().slice(0, 10));
-  const [modal, setModal] = useState<{ event: CalendarEvent; messages: ScoredMsg[]; loading: boolean } | null>(null);
+  const [modal, setModal] = useState<{ event: CalendarEvent; messages: ScoredMsg[]; loading: boolean; ctrl?: AbortController } | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
     (async () => {
       setLoading(true);
       try {
@@ -171,23 +177,31 @@ export default function CalendarPage() {
             });
           }
         }));
-        setEvents(allEvents);
+        if (!cancelled) setEvents(allEvents);
       } catch { /* empty */ }
-      setLoading(false);
+      if (!cancelled) setLoading(false);
     })();
+    return () => { cancelled = true; };
   }, []);
 
   const openMessages = async (event: CalendarEvent) => {
-    setModal({ event, messages: [], loading: true });
+    const ctrl = new AbortController();
+    setModal({ event, messages: [], loading: true, ctrl });
     try {
-      const res = await apiFetch(`/api/chats/${event.chatId}/messages`);
-      if (!res.ok) { setModal(m => m ? { ...m, loading: false } : null); return; }
+      const res = await apiFetch(`/api/chats/${event.chatId}/messages`, { signal: ctrl.signal });
+      if (!res.ok) { setModal(m => m && m.ctrl === ctrl ? { ...m, loading: false } : m); return; }
       const json = await res.json();
       const raw = Array.isArray(json) ? json : (json?.messages ?? []);
       const msgs: Msg[] = raw.map((m: any) => ({ id: String(m.id ?? Math.random()), author: m.senderName ?? m.author ?? "Unknown", text: m.text ?? "", time: m.sentAt ?? m.time ?? "" }));
       const scored = findRelated(msgs, event.title, event.person);
-      setModal(m => m ? { ...m, messages: scored, loading: false } : null);
-    } catch { setModal(m => m ? { ...m, loading: false } : null); }
+      setModal(m => m && m.ctrl === ctrl ? { ...m, messages: scored, loading: false } : m);
+    } catch {
+      setModal(m => m && m.ctrl === ctrl ? { ...m, loading: false } : m);
+    }
+  };
+
+  const closeModal = () => {
+    setModal(m => { m?.ctrl?.abort(); return null; });
   };
 
   const prevMonth = () => { if (month === 0) { setMonth(11); setYear(y => y - 1); } else setMonth(m => m - 1); setSelectedDate(null); };
@@ -203,7 +217,7 @@ export default function CalendarPage() {
 
   return (
     <div className="space-y-6 max-w-[1400px] mx-auto">
-      {modal && <MsgModal event={modal.event} messages={modal.messages} loading={modal.loading} onClose={() => setModal(null)} />}
+      {modal && <MsgModal event={modal.event} messages={modal.messages} loading={modal.loading} onClose={closeModal} />}
 
       <div>
         <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Calendar</h1>
