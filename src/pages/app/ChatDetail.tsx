@@ -252,6 +252,81 @@ function MessageContextModal({ title, messages, onClose }: { title: string; mess
   );
 }
 
+// ─── Voice player bar ────────────────────────────────────────────────────────
+
+const SPEEDS = [1, 1.5, 2];
+const fmtTime = (s: number) => isNaN(s) || !isFinite(s) ? "0:00" : `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+
+function VoicePlayerBar({ author, preview, playing, currentTime, duration, volume, speed, onPlayPause, onSeek, onVolume, onSpeed, onClose }: {
+  author: string; preview: string; playing: boolean;
+  currentTime: number; duration: number; volume: number; speed: number;
+  onPlayPause: () => void; onSeek: (t: number) => void;
+  onVolume: (v: number) => void; onSpeed: (s: number) => void;
+  onClose: () => void;
+}) {
+  const pct = duration > 0 ? (currentTime / duration) * 100 : 0;
+  return (
+    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 w-full max-w-2xl px-4">
+      <div className="bg-background/95 backdrop-blur-md border border-border rounded-2xl shadow-2xl">
+        {/* Seek bar across the top */}
+        <div className="relative h-1 rounded-t-2xl overflow-hidden bg-muted cursor-pointer mx-0">
+          <div className="absolute inset-y-0 left-0 bg-primary transition-all" style={{ width: `${pct}%` }} />
+          <input type="range" min={0} max={duration || 100} step={0.1} value={currentTime}
+            onChange={e => onSeek(Number(e.target.value))}
+            className="absolute inset-0 w-full opacity-0 cursor-pointer h-full" />
+        </div>
+
+        <div className="flex items-center gap-3 px-4 py-3">
+          {/* Avatar + meta */}
+          <div className="h-8 w-8 rounded-full bg-primary/20 text-primary flex items-center justify-center text-xs font-bold shrink-0">
+            {(author ?? "?")[0].toUpperCase()}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-medium leading-tight truncate">{author}</p>
+            <p className="text-xs text-muted-foreground truncate">{preview || "Voice message"}</p>
+          </div>
+
+          {/* Play / Pause */}
+          <button onClick={onPlayPause}
+            className="h-9 w-9 rounded-full bg-primary flex items-center justify-center text-primary-foreground hover:opacity-90 transition shrink-0">
+            {playing
+              ? <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+              : <svg className="h-4 w-4 ml-0.5" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>}
+          </button>
+
+          {/* Time */}
+          <span className="text-xs text-muted-foreground shrink-0 tabular-nums">
+            {fmtTime(currentTime)} / {fmtTime(duration)}
+          </span>
+
+          {/* Speed */}
+          <button onClick={() => onSpeed(SPEEDS[(SPEEDS.indexOf(speed) + 1) % SPEEDS.length])}
+            className="text-xs font-semibold text-muted-foreground hover:text-foreground transition w-8 text-center shrink-0">
+            {speed}×
+          </button>
+
+          {/* Volume */}
+          <div className="hidden sm:flex items-center gap-1.5 shrink-0">
+            <svg className="h-3.5 w-3.5 text-muted-foreground" viewBox="0 0 24 24" fill="currentColor">
+              {volume === 0
+                ? <path d="M16.5 12A4.5 4.5 0 0 0 14 7.97v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51A8.796 8.796 0 0 0 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06A8.99 8.99 0 0 0 17.73 19L19 20.27 20.27 19 5.27 4 4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>
+                : <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3A4.5 4.5 0 0 0 14 7.97v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>}
+            </svg>
+            <input type="range" min={0} max={1} step={0.05} value={volume}
+              onChange={e => onVolume(Number(e.target.value))}
+              className="w-16 h-1 accent-primary cursor-pointer" />
+          </div>
+
+          {/* Close */}
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition shrink-0 ml-1">
+            <XCircle className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 const ChatDetail = () => {
@@ -281,6 +356,11 @@ const ChatDetail = () => {
   const [askError, setAskError] = useState<string | null>(null);
   const [playingMsgId, setPlayingMsgId] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [playingMsg, setPlayingMsg] = useState<{ id: string; author: string; preview: string } | null>(null);
+  const [audioCurrentTime, setAudioCurrentTime] = useState(0);
+  const [audioDuration, setAudioDuration] = useState(0);
+  const [audioVolume, setAudioVolume] = useState(1);
+  const [audioSpeed, setAudioSpeed] = useState(1);
   const [contextModal, setContextModal] = useState<{ title: string; messages: ScoredMessage[] } | null>(null);
   const [expandedSummaryId, setExpandedSummaryId] = useState<string | null>(null);
   const [reviewItems, setReviewItems] = useState<{ id: string; type: string; content: string; reason?: string }[]>([]);
@@ -973,10 +1053,15 @@ const ChatDetail = () => {
                                         } else {
                                           if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
                                           const audio = new Audio(proxyAudio);
+                                          audio.volume = audioVolume;
+                                          audio.playbackRate = audioSpeed;
+                                          audio.ontimeupdate = () => setAudioCurrentTime(audio.currentTime);
+                                          audio.onloadedmetadata = () => setAudioDuration(audio.duration);
+                                          audio.onended = () => { setPlayingMsgId(null); setPlayingMsg(null); setAudioCurrentTime(0); };
                                           audio.play().catch(() => {});
-                                          audio.onended = () => setPlayingMsgId(null);
                                           audioRef.current = audio;
                                           setPlayingMsgId(m.id);
+                                          setPlayingMsg({ id: m.id, author: m.author, preview: m.text.replace("[Voice]", "").trim() });
                                         }
                                       }}
                                       className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs transition bg-primary/10 hover:bg-primary/20 text-primary"
@@ -1229,6 +1314,36 @@ const ChatDetail = () => {
 
         </div>
       </div>
+
+      {/* Floating voice player bar */}
+      {playingMsg && (
+        <VoicePlayerBar
+          author={playingMsg.author}
+          preview={playingMsg.preview}
+          playing={playingMsgId === playingMsg.id}
+          currentTime={audioCurrentTime}
+          duration={audioDuration}
+          volume={audioVolume}
+          speed={audioSpeed}
+          onPlayPause={() => {
+            const audio = audioRef.current;
+            if (!audio) return;
+            if (audio.paused) { audio.play().catch(() => {}); setPlayingMsgId(playingMsg.id); }
+            else { audio.pause(); setPlayingMsgId(null); }
+          }}
+          onSeek={t => { if (audioRef.current) { audioRef.current.currentTime = t; setAudioCurrentTime(t); } }}
+          onVolume={v => { setAudioVolume(v); if (audioRef.current) audioRef.current.volume = v; }}
+          onSpeed={s => { setAudioSpeed(s); if (audioRef.current) audioRef.current.playbackRate = s; }}
+          onClose={() => {
+            audioRef.current?.pause();
+            audioRef.current = null;
+            setPlayingMsgId(null);
+            setPlayingMsg(null);
+            setAudioCurrentTime(0);
+            setAudioDuration(0);
+          }}
+        />
+      )}
     </div>
   );
 };
