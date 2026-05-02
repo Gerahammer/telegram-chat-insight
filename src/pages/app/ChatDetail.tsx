@@ -282,6 +282,7 @@ const ChatDetail = () => {
   const [playingMsgId, setPlayingMsgId] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [contextModal, setContextModal] = useState<{ title: string; messages: ScoredMessage[] } | null>(null);
+  const [expandedSummaryId, setExpandedSummaryId] = useState<string | null>(null);
 
   const openContext = (title: string, query: MsgContextQuery) => {
     const msgs = data?.messages ? findRelatedMessages(data.messages, query) : [];
@@ -593,39 +594,55 @@ const ChatDetail = () => {
                     {dateFrom === today() && " Click \"Generate now\" to create one."}
                   </p>
                 ) : isMultiDay ? (
-                  <div className="space-y-2">
-                    <p className="text-xs text-muted-foreground mb-3">{summaries.length} summaries · {formatDisplay(dateFrom, dateTo)}</p>
-                    {summaries.map(s => {
-                      const sentimentBorder = s.sentiment === "positive" ? "border-l-success" : s.sentiment === "negative" ? "border-l-destructive" : "border-l-border";
-                      const dateStr = s.date ? new Date(s.date).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "short" }) : "";
+                  <div className="divide-y divide-border rounded-lg border border-border overflow-hidden">
+                    {summaries.map((s, i) => {
+                      const isExpanded = expandedSummaryId === null ? i === 0 : expandedSummaryId === s.id;
+                      const sentimentDot = s.sentiment === "positive" ? "bg-success" : s.sentiment === "negative" ? "bg-destructive" : "bg-muted-foreground";
+                      const dateStr = s.date ? new Date(s.date).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" }) : "";
                       const points = s.noActivity ? [] : (s.summaryText ?? "").split("•").map(p => p.trim()).filter(Boolean);
+                      const firstPoint = points[0] ?? "";
                       return (
-                        <div key={s.id} className={`rounded-lg border border-border border-l-4 ${sentimentBorder} ${s.noActivity ? "opacity-50" : "bg-background/50"}`}>
-                          <div className="flex items-center justify-between px-4 py-2.5 border-b border-border/50">
-                            <span className="text-sm font-semibold">{dateStr}</span>
-                            <div className="flex items-center gap-2">
-                              {s.requiresAttention && (
-                                <Badge variant="outline" className="text-warning border-warning/30 bg-warning/10 text-xs gap-1 py-0">
-                                  <AlertCircle className="h-3 w-3" /> Attention
-                                </Badge>
+                        <div key={s.id} className={s.noActivity ? "opacity-50" : ""}>
+                          <button
+                            className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-muted/40 transition"
+                            onClick={() => setExpandedSummaryId(isExpanded ? "__none__" : s.id)}
+                          >
+                            <span className={`h-2 w-2 rounded-full shrink-0 ${sentimentDot}`} />
+                            <span className="text-sm font-medium w-28 shrink-0">{dateStr}</span>
+                            {!isExpanded && (
+                              <span className="text-xs text-muted-foreground truncate flex-1">
+                                {s.noActivity ? "No activity" : firstPoint}
+                              </span>
+                            )}
+                            <div className="flex items-center gap-2 ml-auto shrink-0">
+                              {s.requiresAttention && !s.noActivity && (
+                                <AlertCircle className="h-3.5 w-3.5 text-warning" />
                               )}
-                              {s.sentiment && !s.noActivity && <SentimentBadge sentiment={s.sentiment as any} />}
+                              <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${isExpanded ? "rotate-180" : ""}`} />
                             </div>
-                          </div>
-                          <div className="px-4 py-3">
-                            {s.noActivity ? (
-                              <p className="text-sm text-muted-foreground italic">No activity recorded.</p>
-                            ) : (
+                          </button>
+                          {isExpanded && !s.noActivity && (
+                            <div className="px-4 pb-4 pt-1">
                               <ul className="space-y-1.5">
-                                {points.map((pt, i) => (
-                                  <li key={i} className="flex gap-2 text-sm leading-relaxed">
+                                {points.map((pt, j) => (
+                                  <li key={j} className="flex gap-2 text-sm leading-relaxed">
                                     <span className="text-primary shrink-0 mt-0.5">•</span>
                                     <span>{pt}</span>
                                   </li>
                                 ))}
                               </ul>
-                            )}
-                          </div>
+                              {s.sentiment && (
+                                <div className="mt-3 flex items-center gap-2">
+                                  <SentimentBadge sentiment={s.sentiment as any} />
+                                  {s.requiresAttention && (
+                                    <Badge variant="outline" className="text-warning border-warning/30 bg-warning/10 text-xs gap-1">
+                                      <AlertCircle className="h-3 w-3" /> Needs attention
+                                    </Badge>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
                       );
                     })}
