@@ -11,7 +11,7 @@ import {
   HelpCircle, Flag, Inbox, Loader2, RefreshCw, Calendar, Star,
   ChevronDown, Clock, CheckCircle2, AlertTriangle, Activity,
   GitCommit, Handshake, Lightbulb, Target, Trophy, XCircle,
-  ChevronRight, ThumbsUp, ThumbsDown, Brain,
+  ChevronRight, ThumbsUp, ThumbsDown, Brain, PenLine, Copy,
 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { ChatPhoto } from "@/components/ChatPhoto";
@@ -360,6 +360,11 @@ const ChatDetail = () => {
   const [askLoading, setAskLoading] = useState(false);
   const [askRemaining, setAskRemaining] = useState<number | null>(null);
   const [askError, setAskError] = useState<string | null>(null);
+  const [replyDrafts, setReplyDrafts] = useState<{ tone: string; text: string }[]>([]);
+  const [replyLoading, setReplyLoading] = useState(false);
+  const [replyLastMsg, setReplyLastMsg] = useState<{ author: string; text: string } | null>(null);
+  const [replyRemaining, setReplyRemaining] = useState<number | null>(null);
+  const [replyError, setReplyError] = useState<string | null>(null);
   const [playingMsgId, setPlayingMsgId] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [playingMsg, setPlayingMsg] = useState<{ id: string; author: string; preview: string } | null>(null);
@@ -581,6 +586,28 @@ const ChatDetail = () => {
       setAskError("Request failed");
     } finally {
       setAskLoading(false);
+    }
+  };
+
+  const handleReplyAssist = async () => {
+    if (!id || replyLoading) return;
+    setReplyLoading(true);
+    setReplyError(null);
+    setReplyDrafts([]);
+    try {
+      const res = await apiFetch(`/api/chats/${encodeURIComponent(id)}/reply-suggest`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) {
+        setReplyError(data.message ?? data.error ?? "Failed");
+      } else {
+        setReplyDrafts(data.suggestions ?? []);
+        setReplyLastMsg(data.lastMessage ?? null);
+        setReplyRemaining(data.remaining);
+      }
+    } catch {
+      setReplyError("Request failed");
+    } finally {
+      setReplyLoading(false);
     }
   };
 
@@ -1019,6 +1046,58 @@ const ChatDetail = () => {
                   </div>
                 )}
               </div>
+            )}
+          </Card>
+
+          {/* Reply Assist */}
+          <Card className="p-5 border-primary/20 bg-gradient-to-br from-primary/5 to-transparent">
+            <SectionHeader icon={PenLine} title="Draft a reply"
+              action={
+                <Button size="sm" onClick={handleReplyAssist} disabled={replyLoading} className="gradient-primary border-0 h-7 text-xs">
+                  {replyLoading ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Sparkles className="h-3 w-3 mr-1" />}
+                  {replyLoading ? "Drafting…" : "Generate drafts"}
+                </Button>
+              }
+            />
+            {replyLastMsg && replyDrafts.length === 0 && !replyLoading && (
+              <div className="mb-3 p-3 rounded-lg bg-muted/50 border border-border text-sm">
+                <span className="font-medium text-muted-foreground text-xs uppercase tracking-wide block mb-1">Last message</span>
+                <span className="font-medium">{replyLastMsg.author}: </span>{replyLastMsg.text}
+              </div>
+            )}
+            {replyRemaining !== null && replyDrafts.length === 0 && !replyLoading && (
+              <p className="text-xs text-muted-foreground mb-2">{replyRemaining} drafts remaining this hour</p>
+            )}
+            {replyError && <p className="text-sm text-destructive mb-2">{replyError}</p>}
+            {replyDrafts.length > 0 && (
+              <div className="space-y-3">
+                {replyLastMsg && (
+                  <div className="p-3 rounded-lg bg-muted/50 border border-border text-sm">
+                    <span className="font-medium text-muted-foreground text-xs uppercase tracking-wide block mb-1">Replying to</span>
+                    <span className="font-medium">{replyLastMsg.author}: </span>{replyLastMsg.text}
+                  </div>
+                )}
+                {replyDrafts.map((d) => (
+                  <div key={d.tone} className="rounded-lg border border-border bg-background p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{d.tone}</span>
+                      <button
+                        onClick={() => { navigator.clipboard.writeText(d.text); toast.success("Copied!"); }}
+                        className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition"
+                      >
+                        <Copy className="h-3 w-3" /> Copy
+                      </button>
+                    </div>
+                    <p className="text-sm leading-relaxed">{d.text}</p>
+                  </div>
+                ))}
+                {replyRemaining !== null && (
+                  <p className="text-xs text-muted-foreground">{replyRemaining} drafts remaining this hour</p>
+                )}
+              </div>
+            )}
+            {!replyLoading && replyDrafts.length === 0 && !replyError && (
+              <p className="text-sm text-muted-foreground">Get 3 reply drafts in different tones — professional, direct, and friendly — based on the latest message in this chat.</p>
             )}
           </Card>
 
