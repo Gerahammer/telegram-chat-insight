@@ -1061,8 +1061,11 @@ const ChatDetail = () => {
                             const summary = txt.replace("[Voice]", "").trim();
                             const PROXY_BASE = (import.meta.env.VITE_API_URL || "https://seahorse-app-47666.ondigitalocean.app");
                             const audioFileId = (m as any).audioFileId;
+                            const audioUrl = (m as any).audioUrl;
                             const proxyAudio = audioFileId
                               ? `${PROXY_BASE}/api/proxy/audio?fileId=${encodeURIComponent(audioFileId)}`
+                              : audioUrl
+                              ? `${PROXY_BASE}/api/proxy/audio?url=${encodeURIComponent(audioUrl)}`
                               : null;
                             return (
                               <div className="mt-0.5">
