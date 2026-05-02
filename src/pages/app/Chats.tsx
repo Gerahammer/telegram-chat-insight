@@ -94,14 +94,14 @@ function TagEditor({
     setInput("");
   };
 
-  const stop = (e: React.MouseEvent | React.KeyboardEvent) => { e.preventDefault(); e.stopPropagation(); };
+  const stopClick = (e: React.MouseEvent) => { e.preventDefault(); e.stopPropagation(); };
 
   return (
-    <div onClick={stop} className="flex flex-wrap items-center gap-1 mt-2">
+    <div onClick={stopClick} className="flex flex-wrap items-center gap-1 mt-2">
       {tags.map(t => (
         <span key={t} className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs border ${tagColor(t)}`}>
           {t}
-          <button onClick={(e) => { stop(e); onUpdate(chatId, tags.filter(x => x !== t)); }}
+          <button onClick={(e) => { stopClick(e); onUpdate(chatId, tags.filter(x => x !== t)); }}
             className="ml-0.5 opacity-60 hover:opacity-100 transition rounded-full hover:bg-black/10">
             <X className="h-2.5 w-2.5" />
           </button>
@@ -116,8 +116,8 @@ function TagEditor({
             autoFocus
             onChange={e => setInput(e.target.value)}
             onKeyDown={e => {
-              stop(e);
-              if (e.key === "Enter") { commit(input); }
+              e.stopPropagation();
+              if (e.key === "Enter") { e.preventDefault(); commit(input); }
               if (e.key === "Escape") { setAdding(false); setInput(""); }
             }}
             onBlur={() => setTimeout(() => { setAdding(false); setInput(""); }, 150)}
@@ -127,7 +127,7 @@ function TagEditor({
           {suggestions.length > 0 && (
             <div className="absolute top-full left-0 mt-1 z-20 bg-popover border border-border rounded-lg shadow-lg overflow-hidden min-w-[120px]">
               {suggestions.slice(0, 6).map(s => (
-                <button key={s} onMouseDown={e => { stop(e); commit(s); setAdding(false); }}
+                <button key={s} onMouseDown={e => { stopClick(e); commit(s); setAdding(false); }}
                   className="w-full text-left px-3 py-1.5 text-xs hover:bg-muted transition">
                   {s}
                 </button>
@@ -136,7 +136,7 @@ function TagEditor({
           )}
         </div>
       ) : (
-        <button onClick={(e) => { stop(e); setAdding(true); }}
+        <button onClick={(e) => { stopClick(e); setAdding(true); }}
           className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs text-muted-foreground border border-dashed border-muted-foreground/30 hover:border-primary hover:text-primary transition">
           <Plus className="h-2.5 w-2.5" /> tag
         </button>
