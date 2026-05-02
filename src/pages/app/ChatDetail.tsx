@@ -361,6 +361,8 @@ const ChatDetail = () => {
   const [askRemaining, setAskRemaining] = useState<number | null>(null);
   const [askError, setAskError] = useState<string | null>(null);
   const [activeReplyId, setActiveReplyId] = useState<string | null>(null);
+  const [confirmFeedbackId, setConfirmFeedbackId] = useState<string | null>(null);
+  const [confirmTimelineId, setConfirmTimelineId] = useState<string | null>(null);
   const [replyMap, setReplyMap] = useState<Record<string, { loading: boolean; drafts: { tone: string; text: string }[]; error: string | null; remaining: number | null }>>({});
   const [playingMsgId, setPlayingMsgId] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -1278,7 +1280,7 @@ const ChatDetail = () => {
             ) : (
               <div className="space-y-2">
                 {commitments.slice(0, 5).map(c => (
-                  <div key={c.id} className={`p-3 rounded-lg border cursor-pointer hover:bg-muted/40 transition ${c.status === "OVERDUE" ? "border-destructive/30 bg-destructive/5" : "border-border"}`}
+                  <div key={c.id} className={`p-3 rounded-lg border cursor-pointer hover:bg-muted/40 transition group ${c.status === "OVERDUE" ? "border-destructive/30 bg-destructive/5" : "border-border"}`}
                     onClick={() => openContext(`${c.person}: "${c.commitment.slice(0, 60)}"`, { text: c.commitment, person: c.person })}>
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
@@ -1298,17 +1300,32 @@ const ChatDetail = () => {
                         )}
                         {c.status === "COMPLETED" && <CheckCircle2 className="h-4 w-4 text-success" />}
                         {c.status !== "CANCELLED" && (
-                          <Button size="sm" variant="ghost" className="h-6 w-6 p-0" title="Not a commitment — teach the AI"
-                            onClick={async (e) => {
-                              e.stopPropagation();
-                              const res = await apiFetch(`/api/chats/${encodeURIComponent(id!)}/commitments/${c.id}/feedback`, { method: "POST" });
-                              if (res.ok) {
-                                setCommitments(prev => prev.filter(x => x.id !== c.id));
-                                toast.success("Feedback saved — the AI will avoid this in future summaries");
-                              }
-                            }}>
-                            <ThumbsDown className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
-                          </Button>
+                          confirmFeedbackId === c.id ? (
+                            <div className="flex items-center gap-0.5" onClick={e => e.stopPropagation()}>
+                              <span className="text-xs text-muted-foreground mr-1">Sure?</span>
+                              <button
+                                className="h-6 w-6 flex items-center justify-center rounded text-success hover:bg-success/10 transition text-xs font-medium"
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  const res = await apiFetch(`/api/chats/${encodeURIComponent(id!)}/commitments/${c.id}/feedback`, { method: "POST" });
+                                  if (res.ok) {
+                                    setCommitments(prev => prev.filter(x => x.id !== c.id));
+                                    setConfirmFeedbackId(null);
+                                    toast.success("Feedback saved — the AI will learn from this");
+                                  }
+                                }}
+                              >✓</button>
+                              <button
+                                className="h-6 w-6 flex items-center justify-center rounded text-muted-foreground hover:text-foreground transition text-xs"
+                                onClick={(e) => { e.stopPropagation(); setConfirmFeedbackId(null); }}
+                              >✗</button>
+                            </div>
+                          ) : (
+                            <Button size="sm" variant="ghost" className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition" title="Not a commitment"
+                              onClick={(e) => { e.stopPropagation(); setConfirmFeedbackId(c.id); }}>
+                              <ThumbsDown className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
+                            </Button>
+                          )
                         )}
                       </div>
                     </div>
@@ -1407,20 +1424,35 @@ const ChatDetail = () => {
                             </div>
                             <div className="flex items-center gap-1 shrink-0">
                               <Badge variant="outline" className={`text-xs ${cfg.cls}`}>{cfg.label}</Badge>
-                              <button
-                                title="Not a timeline event — teach the AI"
-                                onClick={async (e) => {
-                                  e.stopPropagation();
-                                  const res = await apiFetch(`/api/chats/${encodeURIComponent(id!)}/timeline/${event.id}/feedback`, { method: "POST" });
-                                  if (res.ok) {
-                                    setTimeline(prev => prev.filter(x => x.id !== event.id));
-                                    toast.success("Feedback saved — the AI will avoid this in future summaries");
-                                  }
-                                }}
-                                className="opacity-0 group-hover:opacity-100 transition h-5 w-5 rounded flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                              >
-                                <ThumbsDown className="h-3 w-3" />
-                              </button>
+                              {confirmTimelineId === event.id ? (
+                                <div className="flex items-center gap-0.5" onClick={e => e.stopPropagation()}>
+                                  <span className="text-xs text-muted-foreground mr-0.5">Sure?</span>
+                                  <button
+                                    className="h-5 w-5 flex items-center justify-center rounded text-success hover:bg-success/10 transition text-xs font-medium"
+                                    onClick={async (e) => {
+                                      e.stopPropagation();
+                                      const res = await apiFetch(`/api/chats/${encodeURIComponent(id!)}/timeline/${event.id}/feedback`, { method: "POST" });
+                                      if (res.ok) {
+                                        setTimeline(prev => prev.filter(x => x.id !== event.id));
+                                        setConfirmTimelineId(null);
+                                        toast.success("Feedback saved — the AI will learn from this");
+                                      }
+                                    }}
+                                  >✓</button>
+                                  <button
+                                    className="h-5 w-5 flex items-center justify-center rounded text-muted-foreground hover:text-foreground transition text-xs"
+                                    onClick={(e) => { e.stopPropagation(); setConfirmTimelineId(null); }}
+                                  >✗</button>
+                                </div>
+                              ) : (
+                                <button
+                                  title="Not a timeline event"
+                                  onClick={(e) => { e.stopPropagation(); setConfirmTimelineId(event.id); }}
+                                  className="opacity-0 group-hover:opacity-100 transition h-5 w-5 rounded flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                                >
+                                  <ThumbsDown className="h-3 w-3" />
+                                </button>
+                              )}
                             </div>
                           </div>
                           {event.dueDate && (

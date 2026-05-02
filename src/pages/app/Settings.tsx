@@ -9,7 +9,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Bot, Copy, RefreshCw } from "lucide-react";
+import { Bot, Copy, RefreshCw, ThumbsDown, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 import { apiFetch } from "@/lib/api";
 import { TrackerBuilderTab } from "@/components/TrackerBuilder";
@@ -34,6 +34,16 @@ interface WorkspaceSettings {
   retentionDays?: number;
 }
 
+interface FeedbackItem {
+  id: string;
+  type: string;
+  content: string;
+  entityId?: string;
+  chatId: string;
+  chatTitle: string;
+  createdAt: string;
+}
+
 const Settings = () => {
   const [me, setMe] = useState<MeResponse | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
@@ -42,6 +52,31 @@ const Settings = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [refreshingToken, setRefreshingToken] = useState(false);
+  const [feedbackList, setFeedbackList] = useState<FeedbackItem[]>([]);
+  const [feedbackLoading, setFeedbackLoading] = useState(false);
+
+  const loadFeedback = async () => {
+    setFeedbackLoading(true);
+    try {
+      const res = await apiFetch("/api/feedback");
+      if (res.ok) {
+        const data = await res.json();
+        setFeedbackList(data.feedback ?? []);
+      }
+    } catch { /* ignore */ }
+    finally { setFeedbackLoading(false); }
+  };
+
+  const undoFeedback = async (feedbackId: string) => {
+    try {
+      const res = await apiFetch(`/api/feedback/${feedbackId}`, { method: "DELETE" });
+      if (res.ok) {
+        const data = await res.json();
+        setFeedbackList(prev => prev.filter(f => f.id !== feedbackId));
+        toast.success(data.restored ? "Undo successful — commitment restored" : "Correction removed");
+      }
+    } catch { toast.error("Failed to undo"); }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -126,13 +161,14 @@ const Settings = () => {
         <p className="text-muted-foreground mt-1">Manage your workspace and AI preferences.</p>
       </div>
 
-      <Tabs defaultValue="workspace">
-        <TabsList className="grid w-full grid-cols-3 lg:grid-cols-5 h-auto">
+      <Tabs defaultValue="workspace" onValueChange={(v) => { if (v === "corrections" && feedbackList.length === 0 && !feedbackLoading) loadFeedback(); }}>
+        <TabsList className="grid w-full grid-cols-3 lg:grid-cols-6 h-auto">
           <TabsTrigger value="workspace">Workspace</TabsTrigger>
           <TabsTrigger value="team">Team</TabsTrigger>
           <TabsTrigger value="ai">AI summaries</TabsTrigger>
           <TabsTrigger value="trackers">Trackers</TabsTrigger>
           <TabsTrigger value="data">Data</TabsTrigger>
+          <TabsTrigger value="corrections">AI Corrections</TabsTrigger>
         </TabsList>
 
         {/* Workspace */}
@@ -307,6 +343,62 @@ const Settings = () => {
             <Button className="gradient-primary border-0" onClick={handleSaveSettings} disabled={saving}>
               {saving ? "Saving..." : "Save changes"}
             </Button>
+          </Card>
+        </TabsContent>
+
+        {/* AI Corrections */}
+        <TabsContent value="corrections" className="mt-6">
+          <Card className="p-6">
+            <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center gap-2">
+                <ThumbsDown className="h-4 w-4 text-muted-foreground" />
+                <h2 className="font-semibold">AI Corrections</h2>
+              </div>
+              <Button variant="outline" size="sm" onClick={loadFeedback} disabled={feedbackLoading}>
+                <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${feedbackLoading ? "animate-spin" : ""}`} />
+                Refresh
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground mb-4">
+              These are items you've marked as incorrect AI extractions. They're used to improve future summaries. Undo to remove the correction (and restore the item if applicable).
+            </p>
+            {feedbackLoading ? (
+              <div className="space-y-2">
+                <Skeleton className="h-14 w-full" />
+                <Skeleton className="h-14 w-full" />
+                <Skeleton className="h-14 w-full" />
+              </div>
+            ) : feedbackList.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8">No corrections recorded yet.</p>
+            ) : (
+              <div className="space-y-2">
+                {feedbackList.map(f => (
+                  <div key={f.id} className="flex items-start gap-3 p-3 rounded-lg border border-border">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <Badge variant="outline" className="text-xs py-0">
+                          {f.type === "NOT_A_COMMITMENT" ? "Not a commitment" : "Not a timeline event"}
+                        </Badge>
+                        <span className="text-xs text-muted-foreground truncate">{f.chatTitle}</span>
+                      </div>
+                      <p className="text-sm text-foreground line-clamp-2">{f.content}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {new Date(f.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                      </p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="shrink-0 text-muted-foreground hover:text-primary gap-1.5"
+                      onClick={() => undoFeedback(f.id)}
+                    >
+                      <Undo2 className="h-3.5 w-3.5" />
+                      Undo
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
           </Card>
         </TabsContent>
       </Tabs>
