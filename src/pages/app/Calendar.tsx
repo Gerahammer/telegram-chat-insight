@@ -77,23 +77,23 @@ export default function CalendarPage() {
             });
           }
 
-          // Get timeline events with due dates
+          // Get timeline events — use dueDate if set, otherwise occurredAt
           const tlRes = await apiFetch(`/api/chats/${chat.id}/timeline`).catch(() => null);
           if (tlRes?.ok) {
             const data = await tlRes.json();
             (data?.events ?? []).forEach((e: any) => {
-              if (e.dueDate) {
-                allEvents.push({
-                  id: e.id,
-                  type: e.type?.toLowerCase() === "deadline" ? "deadline" :
-                        e.type?.toLowerCase() === "agreement" ? "agreement" :
-                        e.type?.toLowerCase() === "milestone" ? "milestone" : "deadline",
-                  title: e.title,
-                  chatId: chat.id,
-                  chatTitle: chat.title,
-                  date: e.dueDate.slice(0, 10),
-                });
-              }
+              const date = (e.dueDate || e.occurredAt)?.slice(0, 10);
+              if (!date) return;
+              allEvents.push({
+                id: e.id,
+                type: e.type?.toLowerCase() === "deadline" ? "deadline" :
+                      e.type?.toLowerCase() === "agreement" ? "agreement" :
+                      e.type?.toLowerCase() === "milestone" ? "milestone" : "deadline",
+                title: e.title,
+                chatId: chat.id,
+                chatTitle: chat.title,
+                date,
+              });
             });
           }
         }));
@@ -107,13 +107,13 @@ export default function CalendarPage() {
   const prevMonth = () => {
     if (month === 0) { setMonth(11); setYear(y => y - 1); }
     else setMonth(m => m - 1);
-    setSelectedDay(null);
+    setSelectedDate(null);
   };
 
   const nextMonth = () => {
     if (month === 11) { setMonth(0); setYear(y => y + 1); }
     else setMonth(m => m + 1);
-    setSelectedDay(null);
+    setSelectedDate(null);
   };
 
   const daysInMonth = getDaysInMonth(year, month);
