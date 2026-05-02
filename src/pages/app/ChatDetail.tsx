@@ -791,7 +791,8 @@ const ChatDetail = () => {
                           {a.priority && <PriorityBadge priority={a.priority} />}
                           {!isResolved && a.id && (
                             <button
-                              onClick={async () => {
+                              onClick={async (e) => {
+                                e.stopPropagation();
                                 try {
                                   const res = await apiFetch(`/api/action-items/${a.id}`, {method:"PATCH", body: JSON.stringify({status:"RESOLVED"})});
                                   if (res.ok) {
@@ -1196,7 +1197,7 @@ const ChatDetail = () => {
                         )}
                       </div>
                       {(c.status === "OPEN" || c.status === "OVERDUE") && (
-                        <Button size="sm" variant="ghost" className="h-6 w-6 p-0 shrink-0" onClick={() => markCommitmentDone(c.id)}>
+                        <Button size="sm" variant="ghost" className="h-6 w-6 p-0 shrink-0" onClick={(e) => { e.stopPropagation(); markCommitmentDone(c.id); }}>
                           <CheckCircle2 className="h-4 w-4 text-muted-foreground hover:text-success" />
                         </Button>
                       )}
