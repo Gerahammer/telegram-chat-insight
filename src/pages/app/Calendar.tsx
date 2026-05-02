@@ -21,11 +21,11 @@ interface CalendarEvent {
 interface Msg { id: string; author: string; text: string; time: string; }
 interface ScoredMsg { m: Msg; highlighted: boolean; }
 
-const TYPE_CONFIG: Record<string, { icon: any; cls: string; label: string }> = {
-  commitment: { icon: GitCommit,    cls: "bg-blue-500/10 text-blue-500 border-blue-500/20",       label: "Commitment" },
-  deadline:   { icon: Clock,        cls: "bg-warning/10 text-warning border-warning/20",           label: "Deadline" },
-  agreement:  { icon: Handshake,    cls: "bg-success/10 text-success border-success/20",           label: "Agreement" },
-  milestone:  { icon: AlertTriangle,cls: "bg-yellow-500/10 text-yellow-500 border-yellow-500/20", label: "Milestone" },
+const TYPE_CONFIG: Record<string, { icon: any; cls: string; dot: string; chip: string; label: string }> = {
+  commitment: { icon: GitCommit,    cls: "bg-blue-500/10 text-blue-500 border-blue-500/20",        dot: "bg-blue-500",   chip: "bg-blue-500/12 text-blue-600 dark:text-blue-400",    label: "Commitment" },
+  deadline:   { icon: Clock,        cls: "bg-amber-500/10 text-amber-600 border-amber-500/20",     dot: "bg-amber-500",  chip: "bg-amber-500/12 text-amber-600 dark:text-amber-400", label: "Deadline" },
+  agreement:  { icon: Handshake,    cls: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20", dot: "bg-emerald-500", chip: "bg-emerald-500/12 text-emerald-600 dark:text-emerald-400", label: "Agreement" },
+  milestone:  { icon: AlertTriangle,cls: "bg-yellow-500/10 text-yellow-600 border-yellow-500/20", dot: "bg-yellow-500", chip: "bg-yellow-500/12 text-yellow-600 dark:text-yellow-400", label: "Milestone" },
 };
 
 // ─── Message scoring ──────────────────────────────────────────────────────────
@@ -248,7 +248,7 @@ export default function CalendarPage() {
                     {DAYS.map(d => <div key={d} className="text-center text-xs font-medium text-muted-foreground py-1">{d}</div>)}
                   </div>
                   {loading ? <Skeleton className="h-48 w-full" /> : (
-                    <div className="grid grid-cols-7 gap-0.5">
+                    <div className="grid grid-cols-7 gap-px">
                       {Array.from({ length: firstD }).map((_, i) => <div key={`empty-${i}`} />)}
                       {Array.from({ length: daysInM }, (_, i) => i + 1).map(day => {
                         const dayEvents = getEventsForDay(day, yOffset, mOffset);
@@ -256,16 +256,38 @@ export default function CalendarPage() {
                         const isToday = dateStr === todayStr;
                         const isSelected = dateStr === selectedDate;
                         const isPast = dateStr < todayStr;
+                        const hasEvents = dayEvents.length > 0;
                         return (
                           <button key={day} onClick={() => setSelectedDate(dateStr === selectedDate ? null : dateStr)}
-                            className={`relative min-h-[60px] p-1.5 rounded-lg border text-left transition ${isSelected ? "border-primary bg-primary/10" : "border-transparent hover:border-border hover:bg-muted/50"} ${isToday ? "font-bold" : ""} ${isPast && !isToday ? "opacity-60" : ""}`}>
-                            <span className={`text-sm ${isToday ? "h-6 w-6 bg-primary text-primary-foreground rounded-full flex items-center justify-center" : ""}`}>{day}</span>
-                            <div className="mt-1 space-y-0.5">
+                            className={`relative min-h-[76px] p-1.5 rounded-lg text-left transition-all
+                              ${isSelected ? "bg-primary/8 ring-1 ring-primary ring-inset" : hasEvents ? "hover:bg-muted/60" : "hover:bg-muted/40"}
+                              ${isToday && !isSelected ? "bg-primary/5" : ""}
+                              ${isPast && !isToday ? "opacity-50" : ""}`}>
+                            {/* Day number */}
+                            <div className="flex justify-center mb-1.5">
+                              <span className={`text-xs leading-none font-medium
+                                ${isToday ? "h-5 w-5 bg-primary text-primary-foreground rounded-full flex items-center justify-center font-bold text-[10px]" :
+                                  isSelected ? "text-primary font-semibold" :
+                                  "text-foreground"}`}>
+                                {day}
+                              </span>
+                            </div>
+                            {/* Event chips */}
+                            <div className="space-y-0.5">
                               {dayEvents.slice(0, 2).map((e, i) => {
                                 const cfg = TYPE_CONFIG[e.type] ?? TYPE_CONFIG.deadline;
-                                return <div key={i} className={`text-xs px-1 py-0.5 rounded truncate ${cfg.cls}`}>{e.title.slice(0, 20)}</div>;
+                                return (
+                                  <div key={i} className={`flex items-center gap-1 px-1.5 py-[3px] rounded-md leading-none ${cfg.chip}`}>
+                                    <span className={`shrink-0 h-1.5 w-1.5 rounded-full ${cfg.dot}`} />
+                                    <span className="text-[10px] font-medium truncate">{e.title}</span>
+                                  </div>
+                                );
                               })}
-                              {dayEvents.length > 2 && <div className="text-xs text-muted-foreground px-1">+{dayEvents.length - 2} more</div>}
+                              {dayEvents.length > 2 && (
+                                <div className="px-1.5 py-[2px] text-[10px] font-medium text-muted-foreground">
+                                  +{dayEvents.length - 2} more
+                                </div>
+                              )}
                             </div>
                           </button>
                         );
