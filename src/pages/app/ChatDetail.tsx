@@ -149,6 +149,71 @@ function SectionHeader({ icon: Icon, title, count, action }: { icon: any; title:
   );
 }
 
+// ─── Message context helpers ──────────────────────────────────────────────────
+
+interface MsgContextQuery { text?: string; person?: string; time?: string; }
+
+function findRelatedMessages(messages: Message[], query: MsgContextQuery, max = 6): Message[] {
+  const scored = messages.map(m => {
+    let score = 0;
+    if (query.person) {
+      const p = query.person.toLowerCase();
+      if (m.author.toLowerCase().includes(p) || p.includes(m.author.toLowerCase().split(" ")[0])) score += 4;
+    }
+    if (query.text) {
+      const words = query.text.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+      const body = m.text.toLowerCase();
+      score += words.filter(w => body.includes(w)).length * 2;
+    }
+    if (query.time && m.time) {
+      const diff = Math.abs(new Date(query.time).getTime() - new Date(m.time).getTime());
+      if (diff < 30 * 60 * 1000) score += 5;
+      else if (diff < 2 * 60 * 60 * 1000) score += 2;
+    }
+    return { m, score };
+  }).filter(x => x.score > 0).sort((a, b) => b.score - a.score);
+
+  // Always include a bit of surrounding context for the top hit
+  if (scored.length === 0) return [];
+  const topIdx = messages.indexOf(scored[0].m);
+  const contextIdxs = new Set(scored.slice(0, max).map(x => messages.indexOf(x.m)));
+  if (topIdx > 0) contextIdxs.add(topIdx - 1);
+  if (topIdx < messages.length - 1) contextIdxs.add(topIdx + 1);
+  return [...contextIdxs].sort((a, b) => a - b).slice(0, max + 2).map(i => messages[i]);
+}
+
+function MessageContextModal({ title, messages, onClose }: { title: string; messages: Message[]; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+      <div className="relative bg-background rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
+          <p className="font-semibold text-sm">{title}</p>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground text-lg leading-none">×</button>
+        </div>
+        <div className="overflow-y-auto p-4 space-y-3">
+          {messages.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-6">No matching messages found in the loaded history.</p>
+          ) : messages.map(m => (
+            <div key={m.id} className="flex gap-2.5">
+              <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium text-primary shrink-0">
+                {(m.author ?? "?")[0].toUpperCase()}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-baseline gap-2">
+                  <span className="text-xs font-medium">{m.author}</span>
+                  <span className="text-xs text-muted-foreground">{m.time ? new Date(m.time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : ""}</span>
+                </div>
+                <p className="text-sm mt-0.5 break-words">{m.text}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 const ChatDetail = () => {
@@ -178,6 +243,12 @@ const ChatDetail = () => {
   const [askError, setAskError] = useState<string | null>(null);
   const [playingMsgId, setPlayingMsgId] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [contextModal, setContextModal] = useState<{ title: string; messages: Message[] } | null>(null);
+
+  const openContext = (title: string, query: MsgContextQuery) => {
+    const msgs = data?.messages ? findRelatedMessages(data.messages, query) : [];
+    setContextModal({ title, messages: msgs });
+  };
   const [trackerGroups, setTrackerGroups] = useState<{ tracker: { id: string; name: string; icon?: string; fields: any[] }; entries: any[] }[]>([]);
 
   const fetchMessages = async () => {
@@ -402,6 +473,14 @@ const ChatDetail = () => {
   return (
     <div className="space-y-6 max-w-[1400px] mx-auto pb-12">
 
+      {contextModal && (
+        <MessageContextModal
+          title={contextModal.title}
+          messages={contextModal.messages}
+          onClose={() => setContextModal(null)}
+        />
+      )}
+
       {/* ── Header ── */}
       <div>
         <Button variant="ghost" size="sm" asChild className="mb-3">
@@ -588,7 +667,7 @@ const ChatDetail = () => {
                   ? <p className="text-sm text-muted-foreground">No unanswered questions.</p>
                   : allUnanswered.map((item, i) => (
                     <div key={i} className="p-3 rounded-lg border border-border bg-warning/5 flex items-start justify-between gap-2">
-                      <p className="text-sm flex-1">{item.q}</p>
+                      <p className="text-sm flex-1 cursor-pointer hover:text-primary transition" onClick={() => openContext(`"${item.q.slice(0, 60)}…"`, { text: item.q })}>{item.q}</p>
                       <button
                         onClick={async () => {
                           if (!id) return;
@@ -848,7 +927,8 @@ const ChatDetail = () => {
             ) : (
               <div className="space-y-2">
                 {commitments.slice(0, 5).map(c => (
-                  <div key={c.id} className={`p-3 rounded-lg border ${c.status === "OVERDUE" ? "border-destructive/30 bg-destructive/5" : "border-border"}`}>
+                  <div key={c.id} className={`p-3 rounded-lg border cursor-pointer hover:bg-muted/40 transition ${c.status === "OVERDUE" ? "border-destructive/30 bg-destructive/5" : "border-border"}`}
+                    onClick={() => openContext(`${c.person}: "${c.commitment.slice(0, 60)}"`, { text: c.commitment, person: c.person })}>
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
                         <span className="text-xs font-medium text-primary">{c.person}</span>
@@ -946,14 +1026,15 @@ const ChatDetail = () => {
                     const cfg = TL[event.type] ?? TL.ISSUE;
                     const Icon = cfg.icon;
                     return (
-                      <div key={event.id} className="flex gap-3 pl-1">
+                      <div key={event.id} className="flex gap-3 pl-1 cursor-pointer group"
+                        onClick={() => openContext(`${cfg.label}: ${event.title}`, { text: `${event.title} ${event.description ?? ""} ${event.people?.join(" ") ?? ""}`, time: event.occurredAt, person: event.people?.[0] })}>
                         <div className={`h-6 w-6 rounded-full border flex items-center justify-center shrink-0 z-10 bg-background ${cfg.cls}`}>
                           <Icon className="h-3 w-3" />
                         </div>
                         <div className="flex-1 pb-2">
                           <div className="flex items-start justify-between gap-1">
                             <div>
-                              <p className="text-xs font-medium leading-tight">{event.title}</p>
+                              <p className="text-xs font-medium leading-tight group-hover:text-primary transition">{event.title}</p>
                               {event.people.length > 0 && (
                                 <p className="text-xs text-muted-foreground mt-0.5">{event.people.join(", ")}</p>
                               )}
