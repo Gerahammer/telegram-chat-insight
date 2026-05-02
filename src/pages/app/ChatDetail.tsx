@@ -178,6 +178,7 @@ const ChatDetail = () => {
   const [askError, setAskError] = useState<string | null>(null);
   const [playingMsgId, setPlayingMsgId] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [trackerGroups, setTrackerGroups] = useState<{ tracker: { id: string; name: string; icon?: string; fields: any[] }; entries: any[] }[]>([]);
 
   const fetchMessages = async () => {
     if (!id) return;
@@ -269,7 +270,7 @@ const ChatDetail = () => {
     return () => { cancelled = true; };
   }, [id, dateFrom, dateTo, data?.chat]);
 
-  // Load timeline + commitments + health in background
+  // Load timeline + commitments + health + tracker entries in background
   useEffect(() => {
     if (!id || !data?.chat) return;
     setSideLoading(true);
@@ -277,10 +278,12 @@ const ChatDetail = () => {
       apiFetch(`/api/chats/${encodeURIComponent(id)}/timeline`).then(r => r.ok ? r.json() : null),
       apiFetch(`/api/chats/${encodeURIComponent(id)}/commitments`).then(r => r.ok ? r.json() : null),
       apiFetch(`/api/chats/${encodeURIComponent(id)}/health`).then(r => r.ok ? r.json() : null),
-    ]).then(([tl, cm, hl]) => {
+      apiFetch(`/api/chats/${encodeURIComponent(id)}/trackers`).then(r => r.ok ? r.json() : null),
+    ]).then(([tl, cm, hl, tr]) => {
       setTimeline(tl?.events ?? []);
       setCommitments(cm?.commitments ?? []);
       setHealth(hl ?? null);
+      setTrackerGroups(tr?.trackers ?? []);
     }).catch(() => {}).finally(() => setSideLoading(false));
   }, [id, data?.chat]);
 
@@ -868,6 +871,61 @@ const ChatDetail = () => {
               </div>
             )}
           </Card>
+
+          {/* Custom Trackers */}
+          {trackerGroups.length > 0 && trackerGroups.map(group => (
+            <Card key={group.tracker.id} className="p-5">
+              <SectionHeader
+                icon={() => <span className="text-base">{group.tracker.icon ?? "📋"}</span>}
+                title={group.tracker.name}
+                count={group.entries.length}
+              />
+              {group.entries.length === 0 ? (
+                <p className="text-xs text-muted-foreground py-4 text-center">No entries found yet</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs mt-2">
+                    <thead>
+                      <tr className="border-b border-border">
+                        {group.tracker.fields.map((f: any) => (
+                          <th key={f.name} className="text-left text-muted-foreground font-medium pb-2 pr-4">{f.name}</th>
+                        ))}
+                        <th className="text-left text-muted-foreground font-medium pb-2">Date</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {group.entries.slice(0, 20).map((entry: any) => (
+                        <tr key={entry.id} className="hover:bg-muted/30 transition">
+                          {group.tracker.fields.map((f: any) => {
+                            const val = entry.data?.[f.name];
+                            return (
+                              <td key={f.name} className="py-2 pr-4">
+                                {val === null || val === undefined ? (
+                                  <span className="text-muted-foreground">—</span>
+                                ) : typeof val === "boolean" ? (
+                                  <span className={val ? "text-green-500" : "text-muted-foreground"}>{val ? "Yes" : "No"}</span>
+                                ) : f.type === "enum" ? (
+                                  <span className="px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">{val}</span>
+                                ) : (
+                                  <span>{String(val)}</span>
+                                )}
+                              </td>
+                            );
+                          })}
+                          <td className="py-2 text-muted-foreground">
+                            {entry.extractedAt ? new Date(entry.extractedAt).toLocaleDateString("en-GB") : "—"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {group.entries.length > 20 && (
+                    <p className="text-xs text-muted-foreground text-center pt-2">+{group.entries.length - 20} more</p>
+                  )}
+                </div>
+              )}
+            </Card>
+          ))}
 
           {/* Timeline */}
           <Card className="p-5">

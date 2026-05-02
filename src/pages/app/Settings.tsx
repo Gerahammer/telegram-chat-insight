@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Bot, Copy, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { apiFetch } from "@/lib/api";
+import { TrackerBuilderTab } from "@/components/TrackerBuilder";
 
 interface Member {
   userId?: string;
@@ -130,6 +131,7 @@ const Settings = () => {
           <TabsTrigger value="workspace">Workspace</TabsTrigger>
           <TabsTrigger value="team">Team</TabsTrigger>
           <TabsTrigger value="ai">AI summaries</TabsTrigger>
+          <TabsTrigger value="trackers">Trackers</TabsTrigger>
           <TabsTrigger value="data">Data</TabsTrigger>
         </TabsList>
 
@@ -276,6 +278,11 @@ const Settings = () => {
               {saving ? "Saving..." : "Save changes"}
             </Button>
           </Card>
+        </TabsContent>
+
+        {/* Custom Trackers */}
+        <TabsContent value="trackers" className="mt-6">
+          <TrackerBuilderTab />
         </TabsContent>
 
         {/* Data */}
