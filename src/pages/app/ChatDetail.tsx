@@ -11,7 +11,7 @@ import {
   HelpCircle, Flag, Inbox, Loader2, RefreshCw, Calendar, Star,
   ChevronDown, Clock, CheckCircle2, AlertTriangle, Activity,
   GitCommit, Handshake, Lightbulb, Target, Trophy, XCircle,
-  ChevronRight,
+  ChevronRight, ThumbsUp, ThumbsDown, Brain,
 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { ChatPhoto } from "@/components/ChatPhoto";
@@ -283,6 +283,7 @@ const ChatDetail = () => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [contextModal, setContextModal] = useState<{ title: string; messages: ScoredMessage[] } | null>(null);
   const [expandedSummaryId, setExpandedSummaryId] = useState<string | null>(null);
+  const [reviewItems, setReviewItems] = useState<{ id: string; type: string; content: string; reason?: string }[]>([]);
 
   const openContext = (title: string, query: MsgContextQuery) => {
     const msgs = data?.messages ? findRelatedMessages(data.messages, query) : [];
@@ -389,11 +390,13 @@ const ChatDetail = () => {
       apiFetch(`/api/chats/${encodeURIComponent(id)}/commitments`).then(r => r.ok ? r.json() : null),
       apiFetch(`/api/chats/${encodeURIComponent(id)}/health`).then(r => r.ok ? r.json() : null),
       apiFetch(`/api/chats/${encodeURIComponent(id)}/trackers`).then(r => r.ok ? r.json() : null),
-    ]).then(([tl, cm, hl, tr]) => {
+      apiFetch(`/api/chats/${encodeURIComponent(id)}/review`).then(r => r.ok ? r.json() : null),
+    ]).then(([tl, cm, hl, tr, rv]) => {
       setTimeline(tl?.events ?? []);
       setCommitments(cm?.commitments ?? []);
       setHealth(hl ?? null);
       setTrackerGroups(tr?.trackers ?? []);
+      setReviewItems(rv?.items ?? []);
     }).catch(() => {}).finally(() => setSideLoading(false));
   }, [id, data?.chat]);
 
@@ -777,6 +780,59 @@ const ChatDetail = () => {
               </div>
             </Card>
           </div>
+
+          {/* AI Review queue */}
+          {reviewItems.length > 0 && (
+            <Card className="p-5 border-yellow-500/20 bg-yellow-500/5">
+              <SectionHeader icon={Brain} title="AI is not sure — help it learn" count={reviewItems.length} />
+              <p className="text-xs text-muted-foreground mb-3">
+                These items were extracted but the AI wasn't confident. Confirm or reject to improve future accuracy.
+              </p>
+              <div className="space-y-2">
+                {reviewItems.map(item => {
+                  const typeLabel: Record<string, string> = {
+                    commitment: "Commitment",
+                    actionItem: "Action item",
+                    timelineEvent: "Timeline event",
+                    unansweredQuestion: "Unanswered question",
+                  };
+                  return (
+                    <div key={item.id} className="flex items-start gap-3 p-3 rounded-lg border border-yellow-500/20 bg-background">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <Badge variant="outline" className="text-xs py-0 border-yellow-500/30 text-yellow-600">{typeLabel[item.type] ?? item.type}</Badge>
+                        </div>
+                        <p className="text-sm font-medium">{item.content}</p>
+                        {item.reason && <p className="text-xs text-muted-foreground mt-0.5 italic">{item.reason}</p>}
+                      </div>
+                      <div className="flex gap-1.5 shrink-0">
+                        <button
+                          onClick={async () => {
+                            await apiFetch(`/api/chats/${id}/review/${item.id}`, { method: "PATCH", body: JSON.stringify({ decision: "confirmed" }) });
+                            setReviewItems(p => p.filter(i => i.id !== item.id));
+                            toast.success("Confirmed — AI will remember this");
+                          }}
+                          className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs bg-success/10 text-success hover:bg-success/20 border border-success/20 transition"
+                        >
+                          <ThumbsUp className="h-3.5 w-3.5" /> Yes
+                        </button>
+                        <button
+                          onClick={async () => {
+                            await apiFetch(`/api/chats/${id}/review/${item.id}`, { method: "PATCH", body: JSON.stringify({ decision: "rejected" }) });
+                            setReviewItems(p => p.filter(i => i.id !== item.id));
+                            toast.success("Rejected — AI will not repeat this");
+                          }}
+                          className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs bg-destructive/10 text-destructive hover:bg-destructive/20 border border-destructive/20 transition"
+                        >
+                          <ThumbsDown className="h-3.5 w-3.5" /> No
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </Card>
+          )}
 
           {/* AI Search */}
           <Card className="p-5 border-primary/20 bg-gradient-to-br from-primary/5 to-transparent">
