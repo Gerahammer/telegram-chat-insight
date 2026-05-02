@@ -152,9 +152,10 @@ function SectionHeader({ icon: Icon, title, count, action }: { icon: any; title:
 // ─── Message context helpers ──────────────────────────────────────────────────
 
 interface MsgContextQuery { text?: string; person?: string; time?: string; }
+interface ScoredMessage { m: Message; highlighted: boolean; }
 
-function findRelatedMessages(messages: Message[], query: MsgContextQuery, max = 6): Message[] {
-  const scored = messages.map(m => {
+function findRelatedMessages(messages: Message[], query: MsgContextQuery): ScoredMessage[] {
+  const scores = messages.map((m, idx) => {
     let score = 0;
     if (query.person) {
       const p = query.person.toLowerCase();
@@ -162,49 +163,55 @@ function findRelatedMessages(messages: Message[], query: MsgContextQuery, max = 
     }
     if (query.text) {
       const words = query.text.toLowerCase().split(/\s+/).filter(w => w.length > 3);
-      const body = m.text.toLowerCase();
-      score += words.filter(w => body.includes(w)).length * 2;
+      score += words.filter(w => m.text.toLowerCase().includes(w)).length * 2;
     }
     if (query.time && m.time) {
       const diff = Math.abs(new Date(query.time).getTime() - new Date(m.time).getTime());
       if (diff < 30 * 60 * 1000) score += 5;
       else if (diff < 2 * 60 * 60 * 1000) score += 2;
     }
-    return { m, score };
-  }).filter(x => x.score > 0).sort((a, b) => b.score - a.score);
+    return { idx, score };
+  });
 
-  // Always include a bit of surrounding context for the top hit
-  if (scored.length === 0) return [];
-  const topIdx = messages.indexOf(scored[0].m);
-  const contextIdxs = new Set(scored.slice(0, max).map(x => messages.indexOf(x.m)));
-  if (topIdx > 0) contextIdxs.add(topIdx - 1);
-  if (topIdx < messages.length - 1) contextIdxs.add(topIdx + 1);
-  return [...contextIdxs].sort((a, b) => a - b).slice(0, max + 2).map(i => messages[i]);
+  const matched = scores.filter(x => x.score > 0).sort((a, b) => b.score - a.score).slice(0, 3);
+  if (matched.length === 0) return [];
+
+  // 1 line of context around each match
+  const included = new Map<number, boolean>();
+  for (const { idx } of matched) {
+    if (idx > 0) included.set(idx - 1, false);
+    included.set(idx, true);
+    if (idx < messages.length - 1) included.set(idx + 1, false);
+  }
+
+  return [...included.entries()]
+    .sort(([a], [b]) => a - b)
+    .map(([idx, highlighted]) => ({ m: messages[idx], highlighted }));
 }
 
-function MessageContextModal({ title, messages, onClose }: { title: string; messages: Message[]; onClose: () => void }) {
+function MessageContextModal({ title, messages, onClose }: { title: string; messages: ScoredMessage[]; onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
       <div className="relative bg-background rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
-          <p className="font-semibold text-sm">{title}</p>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground text-lg leading-none">×</button>
+          <p className="font-semibold text-sm truncate pr-4">{title}</p>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground text-lg leading-none shrink-0">×</button>
         </div>
-        <div className="overflow-y-auto p-4 space-y-3">
+        <div className="overflow-y-auto p-4 space-y-1.5">
           {messages.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-6">No matching messages found in the loaded history.</p>
-          ) : messages.map(m => (
-            <div key={m.id} className="flex gap-2.5">
-              <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium text-primary shrink-0">
+          ) : messages.map(({ m, highlighted }) => (
+            <div key={m.id} className={`flex gap-2.5 rounded-lg px-2 py-1.5 transition ${highlighted ? "bg-primary/10 border border-primary/20" : "opacity-50"}`}>
+              <div className={`h-7 w-7 rounded-full flex items-center justify-center text-xs font-medium shrink-0 ${highlighted ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground"}`}>
                 {(m.author ?? "?")[0].toUpperCase()}
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-baseline gap-2">
-                  <span className="text-xs font-medium">{m.author}</span>
+                  <span className={`text-xs font-medium ${highlighted ? "" : "text-muted-foreground"}`}>{m.author}</span>
                   <span className="text-xs text-muted-foreground">{m.time ? new Date(m.time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : ""}</span>
                 </div>
-                <p className="text-sm mt-0.5 break-words">{m.text}</p>
+                <p className={`text-sm mt-0.5 break-words ${highlighted ? "" : "text-muted-foreground"}`}>{m.text}</p>
               </div>
             </div>
           ))}
@@ -243,7 +250,7 @@ const ChatDetail = () => {
   const [askError, setAskError] = useState<string | null>(null);
   const [playingMsgId, setPlayingMsgId] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const [contextModal, setContextModal] = useState<{ title: string; messages: Message[] } | null>(null);
+  const [contextModal, setContextModal] = useState<{ title: string; messages: ScoredMessage[] } | null>(null);
 
   const openContext = (title: string, query: MsgContextQuery) => {
     const msgs = data?.messages ? findRelatedMessages(data.messages, query) : [];
