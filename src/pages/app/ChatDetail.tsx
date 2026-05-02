@@ -168,23 +168,25 @@ function findRelatedMessages(messages: Message[], query: MsgContextQuery): Score
   if (!messages.length) return [];
 
   const scores = messages.map((m, idx) => {
-    let score = 0;
+    let keywordScore = 0;
+    let bonusScore = 0;
     const msgText = m.text.toLowerCase();
-
-    if (query.person) {
-      const nameParts = query.person.toLowerCase().split(/\s+/);
-      const authorLower = m.author.toLowerCase();
-      if (nameParts.some(p => p.length > 2 && authorLower.includes(p))) score += 4;
-    }
 
     if (query.text) {
       const queryLower = query.text.toLowerCase();
       // Exact phrase match for first meaningful chunk
       const keyPhrase = queryLower.replace(/^[^a-z]+/, "").slice(0, 30);
-      if (keyPhrase.length > 8 && msgText.includes(keyPhrase)) score += 8;
+      if (keyPhrase.length > 8 && msgText.includes(keyPhrase)) keywordScore += 8;
       // Keyword matching with stop words and length filter
       const words = queryLower.split(/\s+/).filter(w => w.length > 4 && !STOP_WORDS.has(w) && /^[a-z]/.test(w));
-      score += words.filter(w => msgText.includes(w)).length * 2;
+      keywordScore += words.filter(w => msgText.includes(w)).length * 2;
+    }
+
+    // Person and time are bonuses only — they cannot qualify a message on their own
+    if (query.person) {
+      const nameParts = query.person.toLowerCase().split(/\s+/);
+      const authorLower = m.author.toLowerCase();
+      if (nameParts.some(p => p.length > 2 && authorLower.includes(p))) bonusScore += 2;
     }
 
     if (query.time && m.time) {
@@ -192,19 +194,22 @@ function findRelatedMessages(messages: Message[], query: MsgContextQuery): Score
       const mt = new Date(m.time).getTime();
       if (!isNaN(qt) && !isNaN(mt)) {
         const diff = Math.abs(qt - mt);
-        if (diff < 30 * 60 * 1000) score += 5;
-        else if (diff < 2 * 60 * 60 * 1000) score += 2;
+        if (diff < 30 * 60 * 1000) bonusScore += 5;
+        else if (diff < 2 * 60 * 60 * 1000) bonusScore += 2;
       }
     }
 
-    return { idx, score };
+    return { idx, keywordScore, score: keywordScore + bonusScore };
   });
 
-  // Require minimum score of 3 to qualify as a match
-  const matched = scores.filter(x => x.score >= 3).sort((a, b) => b.score - a.score).slice(0, 5);
+  // Must have at least one keyword match to qualify — person/time alone is not enough
+  const matched = scores
+    .filter(x => x.keywordScore >= 2)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 5);
+
   if (matched.length === 0) return [];
 
-  // Show matched messages + 1 context message before the best match
   const included = new Map<number, boolean>();
   for (const { idx } of matched) included.set(idx, true);
   const bestIdx = matched[0].idx;
