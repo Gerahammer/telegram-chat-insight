@@ -284,6 +284,8 @@ const ChatDetail = () => {
   const [contextModal, setContextModal] = useState<{ title: string; messages: ScoredMessage[] } | null>(null);
   const [expandedSummaryId, setExpandedSummaryId] = useState<string | null>(null);
   const [reviewItems, setReviewItems] = useState<{ id: string; type: string; content: string; reason?: string }[]>([]);
+  const [decidedItems, setDecidedItems] = useState<{ id: string; type: string; content: string; reason?: string; decision: string }[]>([]);
+  const [showDecided, setShowDecided] = useState(false);
 
   const openContext = (title: string, query: MsgContextQuery) => {
     const msgs = data?.messages ? findRelatedMessages(data.messages, query) : [];
@@ -810,13 +812,7 @@ const ChatDetail = () => {
                           onClick={async () => {
                             await apiFetch(`/api/chats/${id}/review/${item.id}`, { method: "PATCH", body: JSON.stringify({ decision: "confirmed" }) });
                             setReviewItems(p => p.filter(i => i.id !== item.id));
-                            toast.success("Confirmed — AI will remember this", {
-                              action: { label: "Undo", onClick: async () => {
-                                await apiFetch(`/api/chats/${id}/review/${item.id}`, { method: "PATCH", body: JSON.stringify({ decision: null }) });
-                                setReviewItems(p => [item, ...p]);
-                              }},
-                              duration: 8000,
-                            });
+                            setDecidedItems(p => [{ ...item, decision: "confirmed" }, ...p]);
                           }}
                           className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs bg-success/10 text-success hover:bg-success/20 border border-success/20 transition"
                         >
@@ -826,13 +822,7 @@ const ChatDetail = () => {
                           onClick={async () => {
                             await apiFetch(`/api/chats/${id}/review/${item.id}`, { method: "PATCH", body: JSON.stringify({ decision: "rejected" }) });
                             setReviewItems(p => p.filter(i => i.id !== item.id));
-                            toast.success("Rejected — AI will not repeat this", {
-                              action: { label: "Undo", onClick: async () => {
-                                await apiFetch(`/api/chats/${id}/review/${item.id}`, { method: "PATCH", body: JSON.stringify({ decision: null }) });
-                                setReviewItems(p => [item, ...p]);
-                              }},
-                              duration: 8000,
-                            });
+                            setDecidedItems(p => [{ ...item, decision: "rejected" }, ...p]);
                           }}
                           className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs bg-destructive/10 text-destructive hover:bg-destructive/20 border border-destructive/20 transition"
                         >
@@ -843,6 +833,40 @@ const ChatDetail = () => {
                   );
                 })}
               </div>
+
+              {decidedItems.length > 0 && (
+                <div className="mt-3 border-t border-yellow-500/10 pt-3">
+                  <button
+                    className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition w-full"
+                    onClick={() => setShowDecided(p => !p)}
+                  >
+                    <ChevronDown className={`h-3.5 w-3.5 transition-transform ${showDecided ? "rotate-180" : ""}`} />
+                    {decidedItems.length} decided this session
+                  </button>
+                  {showDecided && (
+                    <div className="mt-2 space-y-1.5">
+                      {decidedItems.map(item => (
+                        <div key={item.id} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/40 text-xs">
+                          <span className={`shrink-0 font-medium ${item.decision === "confirmed" ? "text-success" : "text-destructive"}`}>
+                            {item.decision === "confirmed" ? "✓ Yes" : "✗ No"}
+                          </span>
+                          <span className="flex-1 truncate text-muted-foreground">{item.content}</span>
+                          <button
+                            onClick={async () => {
+                              await apiFetch(`/api/chats/${id}/review/${item.id}`, { method: "PATCH", body: JSON.stringify({ decision: null }) });
+                              setDecidedItems(p => p.filter(i => i.id !== item.id));
+                              setReviewItems(p => [{ id: item.id, type: item.type, content: item.content, reason: item.reason }, ...p]);
+                            }}
+                            className="shrink-0 text-muted-foreground hover:text-primary transition underline"
+                          >
+                            Undo
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </Card>
           )}
 
