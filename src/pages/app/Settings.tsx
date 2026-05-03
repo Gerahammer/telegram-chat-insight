@@ -21,7 +21,13 @@ interface Member {
 }
 
 interface MeResponse {
-  user?: { name?: string; email?: string };
+  user?: {
+    name?: string;
+    email?: string;
+    telegramUsername?: string | null;
+    whatsappHandle?: string | null;
+    teamsHandle?: string | null;
+  };
   company?: { name?: string; slug?: string; plan?: string };
   role?: string;
 }
@@ -71,6 +77,41 @@ const Settings = () => {
   const [inviteRole, setInviteRole] = useState<"MEMBER" | "ADMIN">("MEMBER");
   const [inviting, setInviting] = useState(false);
   const [revealedLink, setRevealedLink] = useState<string | null>(null);
+
+  const [handles, setHandles] = useState<{ telegramUsername: string; whatsappHandle: string; teamsHandle: string }>({
+    telegramUsername: "",
+    whatsappHandle: "",
+    teamsHandle: "",
+  });
+  const [savingHandles, setSavingHandles] = useState(false);
+
+  const saveHandles = async () => {
+    setSavingHandles(true);
+    try {
+      const res = await apiFetch("/api/auth/me", {
+        method: "PATCH",
+        body: JSON.stringify({
+          telegramUsername: handles.telegramUsername.trim() || null,
+          whatsappHandle: handles.whatsappHandle.trim() || null,
+          teamsHandle: handles.teamsHandle.trim() || null,
+        }),
+      });
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      // Sync local state with normalized values from the server (e.g. stripped @).
+      setHandles({
+        telegramUsername: data?.user?.telegramUsername ?? "",
+        whatsappHandle: data?.user?.whatsappHandle ?? "",
+        teamsHandle: data?.user?.teamsHandle ?? "",
+      });
+      setMe(prev => prev ? { ...prev, user: { ...prev.user, ...data.user } } : prev);
+      toast.success("Saved");
+    } catch {
+      toast.error("Failed to save");
+    } finally {
+      setSavingHandles(false);
+    }
+  };
 
   const loadMembers = async () => {
     const res = await apiFetch("/api/workspaces/current/members").catch(() => null);
@@ -168,7 +209,14 @@ const Settings = () => {
       if (meRes?.ok) {
         try {
           const data = await meRes.json();
-          if (!cancelled) setMe(data);
+          if (!cancelled) {
+            setMe(data);
+            setHandles({
+              telegramUsername: data?.user?.telegramUsername ?? "",
+              whatsappHandle: data?.user?.whatsappHandle ?? "",
+              teamsHandle: data?.user?.teamsHandle ?? "",
+            });
+          }
         } catch { /* empty */ }
       }
 
@@ -248,7 +296,7 @@ const Settings = () => {
         </TabsList>
 
         {/* Workspace */}
-        <TabsContent value="workspace" className="mt-6">
+        <TabsContent value="workspace" className="mt-6 space-y-6">
           <Card className="p-6 space-y-4 max-w-xl">
             {loading ? (
               <><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /></>
@@ -273,6 +321,54 @@ const Settings = () => {
                     <Badge variant="secondary" className="capitalize">{me?.company?.plan?.toLowerCase() ?? "free"}</Badge>
                   </div>
                 </div>
+              </>
+            )}
+          </Card>
+
+          {/* Personal handles — used by the AI to recognize when chat messages reference you */}
+          <Card className="p-6 space-y-4 max-w-xl">
+            <div>
+              <h2 className="font-semibold">Your handles on other platforms</h2>
+              <p className="text-xs text-muted-foreground mt-1">
+                Add the handles you use elsewhere so the AI can spot questions, mentions, and commitments aimed at you across chats.
+              </p>
+            </div>
+            {loading ? (
+              <Skeleton className="h-32 w-full" />
+            ) : (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="tg-username">Telegram username</Label>
+                  <Input
+                    id="tg-username"
+                    placeholder="hammer123"
+                    value={handles.telegramUsername}
+                    onChange={(e) => setHandles(h => ({ ...h, telegramUsername: e.target.value }))}
+                  />
+                  <p className="text-xs text-muted-foreground">Without the @. e.g. <code>hammer123</code></p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="wa-handle">WhatsApp number</Label>
+                  <Input
+                    id="wa-handle"
+                    placeholder="+15551234567"
+                    value={handles.whatsappHandle}
+                    onChange={(e) => setHandles(h => ({ ...h, whatsappHandle: e.target.value }))}
+                  />
+                  <p className="text-xs text-muted-foreground">In international format with country code.</p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="teams-handle">Teams username or email</Label>
+                  <Input
+                    id="teams-handle"
+                    placeholder="you@company.com"
+                    value={handles.teamsHandle}
+                    onChange={(e) => setHandles(h => ({ ...h, teamsHandle: e.target.value }))}
+                  />
+                </div>
+                <Button onClick={saveHandles} disabled={savingHandles}>
+                  {savingHandles ? "Saving..." : "Save handles"}
+                </Button>
               </>
             )}
           </Card>
