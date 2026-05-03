@@ -259,38 +259,34 @@ export default function CalendarPage() {
                         const isSelected = dateStr === selectedDate;
                         const isPast = dateStr < todayStr;
                         const hasEvents = dayEvents.length > 0;
+                        const eventTitle = dayEvents.map(e => `${TYPE_CONFIG[e.type]?.label ?? e.type}: ${e.title}`).join("\n");
                         return (
-                          <button key={day} onClick={() => setSelectedDate(dateStr === selectedDate ? null : dateStr)}
-                            className={`relative min-h-[76px] p-1.5 rounded-lg text-left transition-all
-                              ${isSelected ? "bg-primary/8 ring-1 ring-primary ring-inset" : hasEvents ? "hover:bg-muted/60" : "hover:bg-muted/40"}
+                          <button
+                            key={day}
+                            onClick={() => setSelectedDate(dateStr === selectedDate ? null : dateStr)}
+                            title={hasEvents ? eventTitle : undefined}
+                            className={`relative aspect-square flex flex-col items-center justify-center rounded-lg text-center transition-all
+                              ${isSelected ? "bg-primary/10 ring-1 ring-primary ring-inset" : hasEvents ? "hover:bg-muted/60" : "hover:bg-muted/40"}
                               ${isToday && !isSelected ? "bg-primary/5" : ""}
-                              ${isPast && !isToday ? "opacity-50" : ""}`}>
-                            {/* Day number */}
-                            <div className="flex justify-center mb-1.5">
-                              <span className={`text-xs leading-none font-medium
-                                ${isToday ? "h-5 w-5 bg-primary text-primary-foreground rounded-full flex items-center justify-center font-bold text-[10px]" :
-                                  isSelected ? "text-primary font-semibold" :
-                                  "text-foreground"}`}>
-                                {day}
-                              </span>
-                            </div>
-                            {/* Event chips */}
-                            <div className="space-y-0.5">
-                              {dayEvents.slice(0, 2).map((e, i) => {
-                                const cfg = TYPE_CONFIG[e.type] ?? TYPE_CONFIG.deadline;
-                                return (
-                                  <div key={i} className={`flex items-center gap-1 px-1.5 py-[3px] rounded-md leading-none ${cfg.chip}`}>
-                                    <span className={`shrink-0 h-1.5 w-1.5 rounded-full ${cfg.dot}`} />
-                                    <span className="text-[10px] font-medium truncate">{e.title}</span>
-                                  </div>
-                                );
-                              })}
-                              {dayEvents.length > 2 && (
-                                <div className="px-1.5 py-[2px] text-[10px] font-medium text-muted-foreground">
-                                  +{dayEvents.length - 2} more
-                                </div>
-                              )}
-                            </div>
+                              ${isPast && !isToday ? "opacity-50" : ""}`}
+                          >
+                            <span className={`text-xs font-medium
+                              ${isToday ? "h-6 w-6 bg-primary text-primary-foreground rounded-full flex items-center justify-center font-bold" :
+                                isSelected ? "text-primary font-semibold" :
+                                "text-foreground"}`}>
+                              {day}
+                            </span>
+                            {hasEvents && (
+                              <div className="flex items-center gap-0.5 mt-1 h-1.5">
+                                {dayEvents.slice(0, 4).map((e, i) => {
+                                  const cfg = TYPE_CONFIG[e.type] ?? TYPE_CONFIG.deadline;
+                                  return <span key={i} className={`h-1.5 w-1.5 rounded-full ${cfg.dot}`} />;
+                                })}
+                                {dayEvents.length > 4 && (
+                                  <span className="text-[8px] leading-none text-muted-foreground ml-0.5">+{dayEvents.length - 4}</span>
+                                )}
+                              </div>
+                            )}
                           </button>
                         );
                       })}
