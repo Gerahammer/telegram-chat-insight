@@ -263,6 +263,7 @@ const Chats = () => {
 
   // Optimistic tag update
   const handleTagUpdate = async (chatId: string, tags: string[]) => {
+    const previousTags = chats.find(c => c.id === chatId)?.tags ?? [];
     setChats(prev => prev.map(c => c.id === chatId ? { ...c, tags } : c));
     try {
       const res = await apiFetch(`/api/chats/${encodeURIComponent(chatId)}/tags`, {
@@ -270,11 +271,11 @@ const Chats = () => {
         body: JSON.stringify({ tags }),
       });
       if (!res.ok) {
-        const prev = chats.find(c => c.id === chatId)?.tags ?? [];
-        setChats(cs => cs.map(c => c.id === chatId ? { ...c, tags: prev } : c));
+        setChats(cs => cs.map(c => c.id === chatId ? { ...c, tags: previousTags } : c));
         toast.error("Failed to save tags");
       }
     } catch {
+      setChats(cs => cs.map(c => c.id === chatId ? { ...c, tags: previousTags } : c));
       toast.error("Failed to save tags");
     }
   };

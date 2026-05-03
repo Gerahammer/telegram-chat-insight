@@ -80,11 +80,13 @@ export function NotificationBell() {
       if (chatsRes?.ok) {
         const data = await chatsRes.json();
         const chats = Array.isArray(data) ? data : (data?.chats ?? []);
+        const today = new Date().toISOString().slice(0, 10);
 
         for (const c of chats) {
+          const summaryDate = (c.todaySummary?.date ?? c.todaySummary?.generatedAt ?? today).slice(0, 10);
           if (c.todaySummary?.requiresAttention) {
             notes.push({
-              id: `attention-${c.id}`,
+              id: `attention-${c.id}-${summaryDate}`,
               type: "attention",
               title: c.title,
               subtitle: "Needs your attention",
@@ -95,7 +97,7 @@ export function NotificationBell() {
           const unansweredCount = c.todaySummary?.unansweredQuestions?.length ?? 0;
           if (unansweredCount > 0) {
             notes.push({
-              id: `unanswered-${c.id}`,
+              id: `unanswered-${c.id}-${summaryDate}`,
               type: "unanswered",
               title: c.title,
               subtitle: `${unansweredCount} unanswered question${unansweredCount > 1 ? "s" : ""}`,
@@ -134,7 +136,7 @@ export function NotificationBell() {
             type: "action",
             title: `${actions.length} open action item${actions.length > 1 ? "s" : ""}`,
             subtitle: "Tap to view all",
-            link: "/app/action-items",
+            link: "/app/actions",
             createdAt: actions[0]?.createdAt ?? now,
           });
         }

@@ -173,7 +173,9 @@ export default function CalendarPage() {
             (data?.events ?? []).forEach((e: any) => {
               const date = (e.dueDate || e.occurredAt)?.slice(0, 10);
               if (!date) return;
-              allEvents.push({ id: e.id, type: e.type?.toLowerCase() === "deadline" ? "deadline" : e.type?.toLowerCase() === "agreement" ? "agreement" : e.type?.toLowerCase() === "milestone" ? "milestone" : "deadline", title: e.title, chatId: chat.id, chatTitle: chat.title, date });
+              const t = (e.type ?? "").toLowerCase();
+              const mapped = t in TYPE_CONFIG ? t : "milestone";
+              allEvents.push({ id: e.id, type: mapped, title: e.title, chatId: chat.id, chatTitle: chat.title, date });
             });
           }
         }));

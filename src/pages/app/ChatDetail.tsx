@@ -338,16 +338,28 @@ function VoicePlayerBar({ author, preview, playing, currentTime, duration, volum
 function FileViewer({ msgId, fileName, mimeType, onClose }: { msgId: string; fileName: string; mimeType: string; onClose: () => void }) {
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [loadError, setLoadError] = useState(false);
+  const blobUrlRef = useRef<string | null>(null);
   const isImage = mimeType.startsWith("image/");
   const isPdf = mimeType === "application/pdf";
 
   useEffect(() => {
-    let url: string | null = null;
+    let cancelled = false;
     apiFetch(`/api/proxy/file/${encodeURIComponent(msgId)}`)
       .then(res => { if (!res.ok) throw new Error("fetch failed"); return res.blob(); })
-      .then(blob => { url = URL.createObjectURL(blob); setBlobUrl(url); })
-      .catch(() => setLoadError(true));
-    return () => { if (url) URL.revokeObjectURL(url); };
+      .then(blob => {
+        const url = URL.createObjectURL(blob);
+        if (cancelled) { URL.revokeObjectURL(url); return; }
+        blobUrlRef.current = url;
+        setBlobUrl(url);
+      })
+      .catch(() => { if (!cancelled) setLoadError(true); });
+    return () => {
+      cancelled = true;
+      if (blobUrlRef.current) {
+        URL.revokeObjectURL(blobUrlRef.current);
+        blobUrlRef.current = null;
+      }
+    };
   }, [msgId]);
 
   useEffect(() => {
@@ -449,35 +461,36 @@ const ChatDetail = () => {
   };
   const [trackerGroups, setTrackerGroups] = useState<{ tracker: { id: string; name: string; icon?: string; fields: any[] }; entries: any[] }[]>([]);
 
-  const fetchMessages = async () => {
-    if (!id) return;
-    try {
-      const res = await apiFetch(`/api/chats/${encodeURIComponent(id!)}/messages`);
-      if (!res.ok) return;
-      const mj: any = await res.json();
-      const raw2 = Array.isArray(mj) ? mj : (mj?.messages ?? []);
-      const msgs = raw2.map((m: any) => ({
-        id: String(m.id ?? crypto.randomUUID()),
-        author: m.senderName ?? m.author ?? "Unknown",
-        text: m.text ?? "",
-        time: m.sentAt ?? m.time ?? "",
-        audioUrl: m.audioUrl ?? null,
-        audioFileId: m.audioFileId ?? null,
-        fileId: m.fileId ?? null,
-        fileName: m.fileName ?? null,
-        fileMimeType: m.fileMimeType ?? null,
-        fileSize: m.fileSize ?? null,
-        hasFileData: m.hasFileData ?? false,
-        flagged: false,
-      }));
-      setData(prev => prev ? { ...prev, messages: msgs } : prev);
-    } catch { /* ignore */ }
-  };
-
   useEffect(() => {
     if (!id) return;
+    const chatId = id;
+    let cancelled = false;
+    const fetchMessages = async () => {
+      try {
+        const res = await apiFetch(`/api/chats/${encodeURIComponent(chatId)}/messages`);
+        if (cancelled || !res.ok) return;
+        const mj: any = await res.json();
+        if (cancelled) return;
+        const raw2 = Array.isArray(mj) ? mj : (mj?.messages ?? []);
+        const msgs = raw2.map((m: any) => ({
+          id: String(m.id ?? crypto.randomUUID()),
+          author: m.senderName ?? m.author ?? "Unknown",
+          text: m.text ?? "",
+          time: m.sentAt ?? m.time ?? "",
+          audioUrl: m.audioUrl ?? null,
+          audioFileId: m.audioFileId ?? null,
+          fileId: m.fileId ?? null,
+          fileName: m.fileName ?? null,
+          fileMimeType: m.fileMimeType ?? null,
+          fileSize: m.fileSize ?? null,
+          hasFileData: m.hasFileData ?? false,
+          flagged: false,
+        }));
+        setData(prev => (prev && prev.chat?.id === chatId) ? { ...prev, messages: msgs } : prev);
+      } catch { /* ignore */ }
+    };
     const interval = setInterval(fetchMessages, 30000);
-    return () => clearInterval(interval);
+    return () => { cancelled = true; clearInterval(interval); };
   }, [id]);
 
   // Load chat + messages

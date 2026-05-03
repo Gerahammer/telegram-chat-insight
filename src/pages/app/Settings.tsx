@@ -32,6 +32,8 @@ interface WorkspaceSettings {
   aiProvider?: string;
   notifyEmail?: boolean;
   retentionDays?: number;
+  autoSummaryIntervalMin?: number;
+  minMessagesForSummary?: number;
 }
 
 interface FeedbackItem {

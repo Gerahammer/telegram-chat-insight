@@ -94,6 +94,9 @@ const Onboarding = () => {
     if (step !== 3 || !detectedChat || summaryTriggered.current) return;
     summaryTriggered.current = true;
 
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
     const generate = async () => {
       setSummaryGenerating(true);
       setSummaryError(null);
@@ -101,9 +104,13 @@ const Onboarding = () => {
         await apiFetch(`/api/chats/${encodeURIComponent(detectedChat.id)}/generate-summary?force=true`, { method: "POST" });
       } catch { /* non-fatal — poll anyway */ }
 
-      // Poll until summary appears (max ~90s)
       let attempts = 0;
+      const schedule = (delay: number) => {
+        if (cancelled) return;
+        timer = setTimeout(poll, delay);
+      };
       const poll = async () => {
+        if (cancelled) return;
         if (attempts++ > 30) {
           setSummaryGenerating(false);
           setSummaryError("Taking longer than usual — your first summary will be ready by tomorrow morning.");
@@ -111,8 +118,10 @@ const Onboarding = () => {
         }
         try {
           const res = await apiFetch(`/api/chats/${encodeURIComponent(detectedChat.id)}/summaries`);
-          if (!res.ok) { setTimeout(poll, 3000); return; }
+          if (cancelled) return;
+          if (!res.ok) { schedule(3000); return; }
           const data = await res.json();
+          if (cancelled) return;
           const summaries = Array.isArray(data) ? data : (data?.summaries ?? []);
           const s = summaries.find((x: any) => !x.noActivity);
           if (s) {
@@ -124,13 +133,18 @@ const Onboarding = () => {
             });
             setSummaryGenerating(false);
           } else {
-            setTimeout(poll, 3000);
+            schedule(3000);
           }
-        } catch { setTimeout(poll, 3000); }
+        } catch { if (!cancelled) schedule(3000); }
       };
-      setTimeout(poll, 4000);
+      schedule(4000);
     };
     generate();
+
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
   }, [step, detectedChat]);
 
   const fetchConnectionToken = async () => {

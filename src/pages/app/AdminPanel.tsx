@@ -56,7 +56,7 @@ const PLAN_COLORS: Record<string, string> = {
 };
 
 export default function AdminPanel() {
-  const [tab, setTab] = useState<"overview" | "users" | "companies">("overview");
+  const [tab, setTab] = useState<"overview" | "users" | "companies" | "settings">("overview");
   const [overview, setOverview] = useState<Overview | null>(null);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [companies, setCompanies] = useState<AdminCompany[]>([]);
@@ -96,6 +96,12 @@ export default function AdminPanel() {
       setLoading(false);
     })();
   }, []);
+
+  // Debounce user search so we don't fire a request on every keystroke
+  useEffect(() => {
+    const t = setTimeout(() => { fetchUsers(userQ); }, 300);
+    return () => clearTimeout(t);
+  }, [userQ]);
 
   const toggleAdmin = async (userId: string, current: boolean) => {
     setUpdating(userId);
@@ -215,7 +221,7 @@ export default function AdminPanel() {
           <div className="flex gap-3">
             <div className="relative flex-1 max-w-sm">
               <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-              <Input value={userQ} onChange={e => { setUserQ(e.target.value); fetchUsers(e.target.value); }}
+              <Input value={userQ} onChange={e => setUserQ(e.target.value)}
                 placeholder="Search by name or email..." className="pl-9" />
             </div>
           </div>
