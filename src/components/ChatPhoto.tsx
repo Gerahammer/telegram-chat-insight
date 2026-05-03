@@ -1,12 +1,24 @@
 import { useState } from "react";
 import { Hash } from "lucide-react";
 
-const PROXY = (import.meta.env.VITE_API_URL || "https://seahorse-app-47666.ondigitalocean.app") + "/api/proxy/image";
+const API_BASE = import.meta.env.VITE_API_URL || "https://seahorse-app-47666.ondigitalocean.app";
+const LEGACY_PROXY = API_BASE + "/api/proxy/image";
 
 interface ChatPhotoProps {
   photoUrl?: string | null;
   title?: string;
   size?: "sm" | "md" | "lg";
+}
+
+function resolvePhotoSrc(photoUrl: string): string {
+  // New format: backend returns a relative URL like "/api/proxy/chat-photo/clxxx".
+  if (photoUrl.startsWith("/")) return API_BASE + photoUrl;
+  // Backward-compat: server might return a Telegram file_id or a full https:// URL
+  // (older deploys). Pipe through the legacy /image proxy.
+  const param = photoUrl.startsWith("https://")
+    ? `url=${encodeURIComponent(photoUrl)}`
+    : `fileId=${encodeURIComponent(photoUrl)}`;
+  return `${LEGACY_PROXY}?${param}`;
 }
 
 export function ChatPhoto({ photoUrl, title = "", size = "md" }: ChatPhotoProps) {
@@ -16,10 +28,9 @@ export function ChatPhoto({ photoUrl, title = "", size = "md" }: ChatPhotoProps)
   const iconSize = size === "lg" ? "h-6 w-6" : size === "md" ? "h-5 w-5" : "h-4 w-4";
 
   if (photoUrl && !failed) {
-    const param = photoUrl.startsWith("https://") ? `url=${encodeURIComponent(photoUrl)}` : `fileId=${encodeURIComponent(photoUrl)}`;
     return (
       <img
-        src={`${PROXY}?${param}`}
+        src={resolvePhotoSrc(photoUrl)}
         alt={title}
         onError={() => setFailed(true)}
         className={`${s} rounded-lg object-cover shrink-0`}
