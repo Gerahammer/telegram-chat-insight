@@ -22,9 +22,16 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface PersonalHighlight { message: string; from: string; time: string; }
+type UnansweredQuestion = string | { question: string; askedOf?: string | null };
+function getQuestionText(q: UnansweredQuestion): string {
+  return typeof q === 'string' ? q : q.question;
+}
+function getQuestionAskedOf(q: UnansweredQuestion): string | null {
+  return typeof q === 'string' ? null : (q.askedOf ?? null);
+}
 interface SummaryData {
   id: string; summaryText?: string; requiresAttention?: boolean;
-  priority?: string; sentiment?: string; unansweredQuestions?: string[];
+  priority?: string; sentiment?: string; unansweredQuestions?: UnansweredQuestion[];
   urgentIssues?: string[]; actionItems?: ActionItem[];
   generatedAt?: string; date?: string; noActivity?: boolean;
 }
@@ -981,9 +988,19 @@ const ChatDetail = () => {
               <div className="space-y-2 max-h-[280px] overflow-y-auto pr-1">
                 {allUnanswered.length === 0
                   ? <p className="text-sm text-muted-foreground">No unanswered questions.</p>
-                  : allUnanswered.map((item, i) => (
+                  : allUnanswered.map((item, i) => {
+                    const text = getQuestionText(item.q);
+                    const askedOf = getQuestionAskedOf(item.q);
+                    return (
                     <div key={i} className="p-3 rounded-lg border border-border bg-warning/5 flex items-start justify-between gap-2">
-                      <p className="text-sm flex-1 cursor-pointer hover:text-primary transition" onClick={() => openContext(`"${item.q.slice(0, 60)}…"`, { text: item.q })}>{item.q}</p>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm cursor-pointer hover:text-primary transition" onClick={() => openContext(`"${text.slice(0, 60)}…"`, { text })}>{text}</p>
+                        {askedOf && (
+                          <div className="mt-1 inline-flex items-center gap-1 text-xs text-warning bg-warning/10 px-1.5 py-0.5 rounded">
+                            for <span className="font-medium">{askedOf}</span>
+                          </div>
+                        )}
+                      </div>
                       <button
                         onClick={async () => {
                           if (!id) return;
@@ -1010,7 +1027,8 @@ const ChatDetail = () => {
                         ✓ Answered
                       </button>
                     </div>
-                  ))}
+                    );
+                  })}
               </div>
             </Card>
           </div>
@@ -1171,7 +1189,10 @@ const ChatDetail = () => {
                   const text = m.text ?? "";
                   const isQ = text.includes("?");
                   const isCom = /\b(i will|i'll|will do|tomorrow|by monday|by tuesday|by friday|by \d)\b/i.test(text);
-                  const isUnans = allUnanswered.some(u => u.q && text.toLowerCase().startsWith(u.q.toLowerCase().slice(0, 25)));
+                  const isUnans = allUnanswered.some(u => {
+                    const qt = getQuestionText(u.q);
+                    return qt && text.toLowerCase().startsWith(qt.toLowerCase().slice(0, 25));
+                  });
                   acc.push(
                     <div key={m.id} className="flex gap-3">
                       <UserAvatar name={m.author} size="md" />
