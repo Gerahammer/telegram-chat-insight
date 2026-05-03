@@ -336,16 +336,33 @@ function VoicePlayerBar({ author, preview, playing, currentTime, duration, volum
 // ─── File viewer modal ────────────────────────────────────────────────────────
 
 function FileViewer({ msgId, fileName, mimeType, onClose }: { msgId: string; fileName: string; mimeType: string; onClose: () => void }) {
-  const PROXY_BASE = (import.meta.env.VITE_API_URL || "https://seahorse-app-47666.ondigitalocean.app");
-  const src = `${PROXY_BASE}/api/proxy/file/${encodeURIComponent(msgId)}`;
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState(false);
   const isImage = mimeType.startsWith("image/");
   const isPdf = mimeType === "application/pdf";
+
+  useEffect(() => {
+    let url: string | null = null;
+    apiFetch(`/api/proxy/file/${encodeURIComponent(msgId)}`)
+      .then(res => { if (!res.ok) throw new Error("fetch failed"); return res.blob(); })
+      .then(blob => { url = URL.createObjectURL(blob); setBlobUrl(url); })
+      .catch(() => setLoadError(true));
+    return () => { if (url) URL.revokeObjectURL(url); };
+  }, [msgId]);
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", h);
     return () => window.removeEventListener("keydown", h);
   }, [onClose]);
+
+  const handleDownload = () => {
+    if (!blobUrl) return;
+    const a = document.createElement("a");
+    a.href = blobUrl;
+    a.download = fileName;
+    a.click();
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose} role="dialog" aria-modal="true">
@@ -354,21 +371,25 @@ function FileViewer({ msgId, fileName, mimeType, onClose }: { msgId: string; fil
         <div className="flex items-center justify-between px-5 py-3 border-b shrink-0">
           <span className="text-sm font-medium truncate pr-4">{fileName}</span>
           <div className="flex items-center gap-2 shrink-0">
-            <a href={src} download={fileName} className="text-xs text-primary hover:underline">Download</a>
+            {blobUrl && <button onClick={handleDownload} className="text-xs text-primary hover:underline">Download</button>}
             <button onClick={onClose} className="text-muted-foreground hover:text-foreground"><XCircle className="h-5 w-5" /></button>
           </div>
         </div>
         <div className="flex-1 overflow-auto flex items-center justify-center p-4 min-h-0">
-          {isImage ? (
-            <img src={src} alt={fileName} className="max-w-full max-h-full object-contain rounded-lg" />
+          {loadError ? (
+            <p className="text-sm text-destructive">Failed to load file.</p>
+          ) : !blobUrl ? (
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          ) : isImage ? (
+            <img src={blobUrl} alt={fileName} className="max-w-full max-h-full object-contain rounded-lg" />
           ) : isPdf ? (
-            <iframe src={src} className="w-full h-full min-h-[60vh] rounded-lg border border-border" title={fileName} />
+            <iframe src={blobUrl} className="w-full h-full min-h-[60vh] rounded-lg border border-border" title={fileName} />
           ) : (
             <div className="text-center space-y-3">
               <p className="text-sm text-muted-foreground">Preview not available for this file type.</p>
-              <a href={src} download={fileName} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm hover:opacity-90 transition">
+              <button onClick={handleDownload} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm hover:opacity-90 transition">
                 Download {fileName}
-              </a>
+              </button>
             </div>
           )}
         </div>
