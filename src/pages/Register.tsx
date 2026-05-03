@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import AuthLayout from "@/components/AuthLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,8 +9,11 @@ import { toast } from "sonner";
 
 const Register = () => {
   const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const inviteToken = params.get("invite") ?? "";
+  const presetEmail = params.get("email") ?? "";
   const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(presetEmail);
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -27,6 +30,17 @@ const Register = () => {
       const token = data.token ?? data.accessToken ?? data.jwt;
       if (!token) throw new Error("No auth token in response");
       setAuthToken(token);
+
+      // Accept the invite immediately so the user lands inside the workspace
+      // instead of being sent through onboarding.
+      if (inviteToken) {
+        const acc = await apiFetch(`/api/invites/accept/${encodeURIComponent(inviteToken)}`, { method: "POST" });
+        if (acc.ok) {
+          navigate("/app");
+          return;
+        }
+        // Fall through to onboarding if the invite couldn't be applied.
+      }
       navigate("/onboarding");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Registration failed");

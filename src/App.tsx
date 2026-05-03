@@ -8,6 +8,7 @@ import NotFound from "./pages/NotFound.tsx";
 import Login from "./pages/Login.tsx";
 import Register from "./pages/Register.tsx";
 import ForgotPassword from "./pages/ForgotPassword.tsx";
+import AcceptInvite from "./pages/AcceptInvite.tsx";
 import Onboarding from "./pages/Onboarding.tsx";
 import AppLayout from "./components/AppLayout.tsx";
 import Dashboard from "./pages/app/Dashboard.tsx";
@@ -36,6 +37,7 @@ const App = () => (
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/accept-invite" element={<AcceptInvite />} />
           <Route path="/onboarding" element={<Onboarding />} />
           <Route path="/app" element={<AppLayout />}>
             <Route index element={<Dashboard />} />

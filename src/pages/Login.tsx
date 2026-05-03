@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import AuthLayout from "@/components/AuthLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +9,8 @@ import { toast } from "sonner";
 
 const Login = () => {
   const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const inviteToken = params.get("invite") ?? "";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -26,6 +28,12 @@ const Login = () => {
       const token = data.token ?? data.accessToken ?? data.jwt;
       if (!token) throw new Error("No auth token in response");
       setAuthToken(token);
+
+      // If the user came from an invite link, accept it on their behalf
+      if (inviteToken) {
+        await apiFetch(`/api/invites/accept/${encodeURIComponent(inviteToken)}`, { method: "POST" })
+          .catch(() => null);
+      }
       navigate("/app");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Login failed");

@@ -9,7 +9,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Bot, Copy, RefreshCw, ThumbsDown, Undo2 } from "lucide-react";
+import { Bot, Copy, RefreshCw, ThumbsDown, Undo2, UserPlus, X } from "lucide-react";
 import { toast } from "sonner";
 import { apiFetch } from "@/lib/api";
 import { TrackerBuilderTab } from "@/components/TrackerBuilder";
@@ -46,6 +46,15 @@ interface FeedbackItem {
   createdAt: string;
 }
 
+interface PendingInvite {
+  id: string;
+  email: string;
+  role: string;
+  expiresAt: string;
+  createdAt: string;
+  link: string;
+}
+
 const Settings = () => {
   const [me, setMe] = useState<MeResponse | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
@@ -56,6 +65,73 @@ const Settings = () => {
   const [refreshingToken, setRefreshingToken] = useState(false);
   const [feedbackList, setFeedbackList] = useState<FeedbackItem[]>([]);
   const [feedbackLoading, setFeedbackLoading] = useState(false);
+
+  const [invites, setInvites] = useState<PendingInvite[]>([]);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteRole, setInviteRole] = useState<"MEMBER" | "ADMIN">("MEMBER");
+  const [inviting, setInviting] = useState(false);
+  const [revealedLink, setRevealedLink] = useState<string | null>(null);
+
+  const loadMembers = async () => {
+    const res = await apiFetch("/api/workspaces/current/members").catch(() => null);
+    if (res?.ok) {
+      try {
+        const data = await res.json();
+        setMembers(data.members ?? []);
+      } catch { /* empty */ }
+    }
+  };
+
+  const loadInvites = async () => {
+    const res = await apiFetch("/api/invites").catch(() => null);
+    if (res?.ok) {
+      try {
+        const data = await res.json();
+        setInvites(data.invites ?? []);
+      } catch { /* empty */ }
+    }
+  };
+
+  const handleInvite = async () => {
+    if (!inviteEmail.trim()) return;
+    setInviting(true);
+    try {
+      const res = await apiFetch("/api/invites", {
+        method: "POST",
+        body: JSON.stringify({ email: inviteEmail.trim().toLowerCase(), role: inviteRole }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.message || "Failed to invite");
+      setInviteEmail("");
+      setRevealedLink(data?.invite?.link ?? null);
+      toast.success("Invite link generated");
+      loadInvites();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to invite");
+    } finally {
+      setInviting(false);
+    }
+  };
+
+  const revokeInvite = async (id: string) => {
+    try {
+      const res = await apiFetch(`/api/invites/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error();
+      setInvites(prev => prev.filter(i => i.id !== id));
+      toast.success("Invite revoked");
+    } catch {
+      toast.error("Failed to revoke invite");
+    }
+  };
+
+  const copyToClipboard = async (text: string, label = "Link") => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success(`${label} copied`);
+    } catch {
+      toast.error("Couldn't copy — please copy manually");
+    }
+  };
 
   const loadFeedback = async () => {
     setFeedbackLoading(true);
@@ -92,14 +168,12 @@ const Settings = () => {
       if (meRes?.ok) {
         try {
           const data = await meRes.json();
-          if (!cancelled) {
-            setMe(data);
-            // Members come from the company data — use me endpoint for now
-            // showing just the current user
-            setMembers([{ userId: data.user?.email, role: data.role, user: data.user }]);
-          }
+          if (!cancelled) setMe(data);
         } catch { /* empty */ }
       }
+
+      // Load real member list + pending invites in parallel
+      Promise.all([loadMembers(), loadInvites()]).catch(() => {});
 
       if (tokenRes?.ok) {
         try {
@@ -205,7 +279,78 @@ const Settings = () => {
         </TabsContent>
 
         {/* Team */}
-        <TabsContent value="team" className="mt-6">
+        <TabsContent value="team" className="mt-6 space-y-6">
+          {/* Invite member */}
+          {(me?.role === "OWNER" || me?.role === "ADMIN") && (
+            <Card className="p-6 space-y-4">
+              <div>
+                <h2 className="font-semibold flex items-center gap-2">
+                  <UserPlus className="h-4 w-4" /> Invite a team member
+                </h2>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Generate a shareable link valid for 7 days. Send it to your teammate over any channel you prefer.
+                </p>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <Input
+                  type="email"
+                  placeholder="teammate@company.com"
+                  value={inviteEmail}
+                  onChange={(e) => setInviteEmail(e.target.value)}
+                  className="flex-1"
+                />
+                <Select value={inviteRole} onValueChange={(v: "MEMBER" | "ADMIN") => setInviteRole(v)}>
+                  <SelectTrigger className="w-full sm:w-[140px]"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="MEMBER">Member</SelectItem>
+                    <SelectItem value="ADMIN">Admin</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button onClick={handleInvite} disabled={inviting || !inviteEmail.trim()}>
+                  {inviting ? "Inviting..." : "Generate link"}
+                </Button>
+              </div>
+
+              {revealedLink && (
+                <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 space-y-2">
+                  <div className="text-xs font-medium text-primary">Invite link ready — copy and share:</div>
+                  <div className="flex items-center gap-2">
+                    <code className="flex-1 text-xs bg-background border rounded px-2 py-1.5 break-all">{revealedLink}</code>
+                    <Button size="sm" variant="outline" onClick={() => copyToClipboard(revealedLink, "Invite link")}>
+                      <Copy className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </Card>
+          )}
+
+          {/* Pending invites */}
+          {(me?.role === "OWNER" || me?.role === "ADMIN") && invites.length > 0 && (
+            <Card className="p-6">
+              <h2 className="font-semibold mb-4">Pending invites</h2>
+              <div className="space-y-2">
+                {invites.map(i => (
+                  <div key={i.id} className="flex items-center justify-between p-3 border border-border rounded-lg gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-medium truncate">{i.email}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {i.role.toLowerCase()} · expires {new Date(i.expiresAt).toLocaleDateString()}
+                      </div>
+                    </div>
+                    <Button size="sm" variant="ghost" onClick={() => copyToClipboard(i.link, "Invite link")}>
+                      <Copy className="h-3.5 w-3.5 mr-1" /> Copy
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => revokeInvite(i.id)} title="Revoke invite">
+                      <X className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
+
+          {/* Active members */}
           <Card className="p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-semibold">Team members</h2>
