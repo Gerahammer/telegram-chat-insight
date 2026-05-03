@@ -444,6 +444,7 @@ const ChatDetail = () => {
   const [playingMsgId, setPlayingMsgId] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [playingMsg, setPlayingMsg] = useState<{ id: string; author: string; preview: string } | null>(null);
+  const [failedAudio, setFailedAudio] = useState<Set<string>>(new Set());
   const [audioCurrentTime, setAudioCurrentTime] = useState(0);
   const [audioDuration, setAudioDuration] = useState(0);
   const [audioVolume, setAudioVolume] = useState(1);
@@ -1200,7 +1201,7 @@ const ChatDetail = () => {
                               <div className="mt-0.5">
                                 <div className="flex items-center gap-2 mb-1">
                                   <span className="text-xs text-muted-foreground">🎤 Voice</span>
-                                  {proxyAudio && (
+                                  {proxyAudio && !failedAudio.has(m.id) && (
                                     <button
                                       onClick={() => {
                                         if (playingMsgId === m.id) {
@@ -1214,7 +1215,16 @@ const ChatDetail = () => {
                                           audio.ontimeupdate = () => setAudioCurrentTime(audio.currentTime);
                                           audio.onloadedmetadata = () => setAudioDuration(audio.duration);
                                           audio.onended = () => { setPlayingMsgId(null); setPlayingMsg(null); setAudioCurrentTime(0); };
-                                          audio.play().catch(() => {});
+                                          audio.onerror = () => {
+                                            setFailedAudio(prev => new Set(prev).add(m.id));
+                                            setPlayingMsgId(null);
+                                            setPlayingMsg(null);
+                                          };
+                                          audio.play().catch(() => {
+                                            setFailedAudio(prev => new Set(prev).add(m.id));
+                                            setPlayingMsgId(null);
+                                            setPlayingMsg(null);
+                                          });
                                           audioRef.current = audio;
                                           setPlayingMsgId(m.id);
                                           setPlayingMsg({ id: m.id, author: m.author, preview: m.text.replace("[Voice]", "").trim() });
@@ -1227,6 +1237,11 @@ const ChatDetail = () => {
                                         : <><svg className="h-3 w-3" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg> Play</>
                                       }
                                     </button>
+                                  )}
+                                  {failedAudio.has(m.id) && (
+                                    <span className="text-xs text-muted-foreground italic" title="Voice file is no longer available on Telegram. Transcript is shown below.">
+                                      audio unavailable
+                                    </span>
                                   )}
                                 </div>
                                 <p className="text-sm">{summary}</p>
