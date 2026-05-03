@@ -9,7 +9,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Bot, Copy, RefreshCw, ThumbsDown, Undo2, UserPlus, X } from "lucide-react";
+import { BookOpen, Bot, Copy, Plus, RefreshCw, Sparkles, ThumbsDown, Trash2, Undo2, UserPlus, X } from "lucide-react";
 import { toast } from "sonner";
 import { apiFetch } from "@/lib/api";
 import { TrackerBuilderTab } from "@/components/TrackerBuilder";
@@ -61,6 +61,59 @@ interface PendingInvite {
   link: string;
 }
 
+interface GlossaryEntry {
+  id: string;
+  term: string;
+  definition: string;
+  createdAt: string;
+}
+
+interface GlossarySuggestion {
+  term: string;
+  count: number;
+  speakers: number;
+  examples: string[];
+}
+
+function SuggestionRow({ suggestion, onAdd }: { suggestion: GlossarySuggestion; onAdd: (definition: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [definition, setDefinition] = useState("");
+  return (
+    <div className="p-3 border border-border rounded-lg">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="font-medium text-sm">{suggestion.term}</div>
+          <div className="text-xs text-muted-foreground mt-0.5">
+            Used {suggestion.count}× by {suggestion.speakers} {suggestion.speakers === 1 ? "person" : "people"}
+          </div>
+          {suggestion.examples.length > 0 && (
+            <div className="text-xs text-muted-foreground mt-1 italic line-clamp-1">"{suggestion.examples[0]}"</div>
+          )}
+        </div>
+        {!open && (
+          <Button size="sm" variant="outline" onClick={() => setOpen(true)}>Define</Button>
+        )}
+      </div>
+      {open && (
+        <div className="mt-2 space-y-2">
+          <Input
+            placeholder={`What does "${suggestion.term}" mean in your company?`}
+            value={definition}
+            onChange={(e) => setDefinition(e.target.value)}
+            autoFocus
+          />
+          <div className="flex gap-2">
+            <Button size="sm" onClick={() => { if (definition.trim()) { onAdd(definition.trim()); setOpen(false); } }} disabled={!definition.trim()}>
+              Add to glossary
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => { setOpen(false); setDefinition(""); }}>Cancel</Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 const Settings = () => {
   const [me, setMe] = useState<MeResponse | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
@@ -84,6 +137,122 @@ const Settings = () => {
     teamsHandle: "",
   });
   const [savingHandles, setSavingHandles] = useState(false);
+
+  const [glossaryEntries, setGlossaryEntries] = useState<GlossaryEntry[]>([]);
+  const [glossarySuggestions, setGlossarySuggestions] = useState<GlossarySuggestion[]>([]);
+  const [glossaryLoading, setGlossaryLoading] = useState(false);
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
+  const [newTerm, setNewTerm] = useState("");
+  const [newDefinition, setNewDefinition] = useState("");
+  const [savingTerm, setSavingTerm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editTerm, setEditTerm] = useState("");
+  const [editDefinition, setEditDefinition] = useState("");
+
+  const loadGlossary = async () => {
+    setGlossaryLoading(true);
+    try {
+      const [entriesRes, suggestionsRes] = await Promise.all([
+        apiFetch("/api/glossary").catch(() => null),
+        apiFetch("/api/glossary/suggestions").catch(() => null),
+      ]);
+      if (entriesRes?.ok) {
+        const data = await entriesRes.json();
+        setGlossaryEntries(data.entries ?? []);
+      }
+      if (suggestionsRes?.ok) {
+        const data = await suggestionsRes.json();
+        setGlossarySuggestions(data.suggestions ?? []);
+      }
+    } finally {
+      setGlossaryLoading(false);
+    }
+  };
+
+  const refreshSuggestions = async () => {
+    setSuggestionsLoading(true);
+    try {
+      const res = await apiFetch("/api/glossary/suggestions");
+      if (res.ok) {
+        const data = await res.json();
+        setGlossarySuggestions(data.suggestions ?? []);
+      }
+    } finally {
+      setSuggestionsLoading(false);
+    }
+  };
+
+  const addGlossaryTerm = async (termOverride?: string, definitionOverride?: string) => {
+    const term = (termOverride ?? newTerm).trim();
+    const definition = (definitionOverride ?? newDefinition).trim();
+    if (!term || !definition) {
+      toast.error("Term and definition are required");
+      return;
+    }
+    setSavingTerm(true);
+    try {
+      const res = await apiFetch("/api/glossary", {
+        method: "POST",
+        body: JSON.stringify({ term, definition }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.message || "Failed to save");
+      setGlossaryEntries(prev => [...prev, data.entry].sort((a, b) => a.term.localeCompare(b.term)));
+      // Drop the term from suggestions if it was there.
+      setGlossarySuggestions(prev => prev.filter(s => s.term.toLowerCase() !== term.toLowerCase()));
+      if (!termOverride) {
+        setNewTerm("");
+        setNewDefinition("");
+      }
+      toast.success("Added to glossary");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to save");
+    } finally {
+      setSavingTerm(false);
+    }
+  };
+
+  const startEdit = (entry: GlossaryEntry) => {
+    setEditingId(entry.id);
+    setEditTerm(entry.term);
+    setEditDefinition(entry.definition);
+  };
+
+  const saveEdit = async () => {
+    if (!editingId) return;
+    const term = editTerm.trim();
+    const definition = editDefinition.trim();
+    if (!term || !definition) {
+      toast.error("Term and definition are required");
+      return;
+    }
+    try {
+      const res = await apiFetch(`/api/glossary/${editingId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ term, definition }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.message || "Failed to save");
+      setGlossaryEntries(prev =>
+        prev.map(e => e.id === editingId ? data.entry : e).sort((a, b) => a.term.localeCompare(b.term))
+      );
+      setEditingId(null);
+      toast.success("Updated");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to save");
+    }
+  };
+
+  const deleteGlossaryTerm = async (id: string) => {
+    try {
+      const res = await apiFetch(`/api/glossary/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error();
+      setGlossaryEntries(prev => prev.filter(e => e.id !== id));
+      toast.success("Removed");
+    } catch {
+      toast.error("Failed to delete");
+    }
+  };
 
   const saveHandles = async () => {
     setSavingHandles(true);
@@ -285,12 +454,16 @@ const Settings = () => {
         <p className="text-muted-foreground mt-1">Manage your workspace and AI preferences.</p>
       </div>
 
-      <Tabs defaultValue="workspace" onValueChange={(v) => { if (v === "corrections" && feedbackList.length === 0 && !feedbackLoading) loadFeedback(); }}>
-        <TabsList className="grid w-full grid-cols-3 lg:grid-cols-6 h-auto">
+      <Tabs defaultValue="workspace" onValueChange={(v) => {
+        if (v === "corrections" && feedbackList.length === 0 && !feedbackLoading) loadFeedback();
+        if (v === "glossary" && glossaryEntries.length === 0 && !glossaryLoading) loadGlossary();
+      }}>
+        <TabsList className="grid w-full grid-cols-4 lg:grid-cols-7 h-auto">
           <TabsTrigger value="workspace">Workspace</TabsTrigger>
           <TabsTrigger value="team">Team</TabsTrigger>
           <TabsTrigger value="ai">AI summaries</TabsTrigger>
           <TabsTrigger value="trackers">Trackers</TabsTrigger>
+          <TabsTrigger value="glossary">Glossary</TabsTrigger>
           <TabsTrigger value="data">Data</TabsTrigger>
           <TabsTrigger value="corrections">AI Corrections</TabsTrigger>
         </TabsList>
@@ -562,6 +735,110 @@ const Settings = () => {
         {/* Custom Trackers */}
         <TabsContent value="trackers" className="mt-6">
           <TrackerBuilderTab />
+        </TabsContent>
+
+        {/* Business Glossary */}
+        <TabsContent value="glossary" className="mt-6 space-y-6">
+          <Card className="p-6 space-y-4">
+            <div>
+              <h2 className="font-semibold flex items-center gap-2">
+                <BookOpen className="h-4 w-4" /> Business glossary
+              </h2>
+              <p className="text-xs text-muted-foreground mt-1">
+                Define terms, acronyms, product names, and internal jargon. The AI uses these definitions when summarising chats so it interprets and reuses them correctly.
+              </p>
+            </div>
+
+            {/* Add new */}
+            <div className="grid grid-cols-1 md:grid-cols-[1fr_2fr_auto] gap-2 items-start">
+              <Input
+                placeholder="Term (e.g. SLA, Acme Pro)"
+                value={newTerm}
+                onChange={(e) => setNewTerm(e.target.value)}
+              />
+              <Input
+                placeholder="Definition — what does this mean in your company?"
+                value={newDefinition}
+                onChange={(e) => setNewDefinition(e.target.value)}
+              />
+              <Button onClick={() => addGlossaryTerm()} disabled={savingTerm || !newTerm.trim() || !newDefinition.trim()}>
+                <Plus className="h-4 w-4 mr-1" /> Add
+              </Button>
+            </div>
+          </Card>
+
+          {/* Suggestions */}
+          <Card className="p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="font-semibold flex items-center gap-2">
+                  <Sparkles className="h-4 w-4" /> Suggested terms
+                </h2>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Words used frequently across your chats but not yet defined. Click "Add" on any to define it.
+                </p>
+              </div>
+              <Button size="sm" variant="outline" onClick={refreshSuggestions} disabled={suggestionsLoading}>
+                <RefreshCw className={`h-3.5 w-3.5 mr-1 ${suggestionsLoading ? "animate-spin" : ""}`} /> Refresh
+              </Button>
+            </div>
+
+            {glossaryLoading ? (
+              <Skeleton className="h-24 w-full" />
+            ) : glossarySuggestions.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-4">No suggestions right now. Once your chats have more activity, recurring company-specific terms will show up here.</p>
+            ) : (
+              <div className="space-y-2">
+                {glossarySuggestions.map((s) => (
+                  <SuggestionRow
+                    key={s.term}
+                    suggestion={s}
+                    onAdd={(definition) => addGlossaryTerm(s.term, definition)}
+                  />
+                ))}
+              </div>
+            )}
+          </Card>
+
+          {/* Existing entries */}
+          <Card className="p-6 space-y-4">
+            <h2 className="font-semibold">Defined terms ({glossaryEntries.length})</h2>
+            {glossaryLoading ? (
+              <Skeleton className="h-24 w-full" />
+            ) : glossaryEntries.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-4">No glossary terms yet.</p>
+            ) : (
+              <div className="space-y-2">
+                {glossaryEntries.map((e) => (
+                  <div key={e.id} className="p-3 border border-border rounded-lg">
+                    {editingId === e.id ? (
+                      <div className="space-y-2">
+                        <Input value={editTerm} onChange={(ev) => setEditTerm(ev.target.value)} />
+                        <Input value={editDefinition} onChange={(ev) => setEditDefinition(ev.target.value)} />
+                        <div className="flex gap-2">
+                          <Button size="sm" onClick={saveEdit}>Save</Button>
+                          <Button size="sm" variant="ghost" onClick={() => setEditingId(null)}>Cancel</Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <div className="font-medium text-sm">{e.term}</div>
+                          <div className="text-sm text-muted-foreground mt-0.5 break-words">{e.definition}</div>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <Button size="sm" variant="ghost" onClick={() => startEdit(e)}>Edit</Button>
+                          <Button size="sm" variant="ghost" onClick={() => deleteGlossaryTerm(e.id)} title="Remove">
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
         </TabsContent>
 
         {/* Data */}
