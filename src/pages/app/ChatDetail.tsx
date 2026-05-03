@@ -1223,7 +1223,7 @@ const ChatDetail = () => {
                           if (txt.startsWith("[File]") || txt.startsWith("[Image]") || txt.startsWith("[Video]")) {
                             const emoji = txt.startsWith("[File]") ? "📎" : txt.startsWith("[Image]") ? "🖼️" : "🎥";
                             const label = txt.replace(/^\[(?:File|Image|Video)\]\s*/, "").trim();
-                            const canOpen = (m as any).hasFileData && (m as any).fileMimeType;
+                            const canOpen = ((m as any).hasFileData || (m as any).fileId) && (m as any).fileMimeType;
                             return (
                               <div className="mt-0.5 flex items-center gap-2">
                                 <span className="text-sm text-muted-foreground">{emoji} {label}</span>
