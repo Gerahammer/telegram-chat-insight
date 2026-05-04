@@ -519,6 +519,31 @@ const ChatDetail = () => {
     }
   };
 
+  const [refreshingTrackerId, setRefreshingTrackerId] = useState<string | null>(null);
+
+  const refreshTracker = async (trackerId: string) => {
+    if (!id) return;
+    setRefreshingTrackerId(trackerId);
+    try {
+      const res = await apiFetch(`/api/chats/${encodeURIComponent(id)}/trackers/refresh?trackerId=${encodeURIComponent(trackerId)}`, {
+        method: "POST",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.message || "Refresh failed");
+      // Server returns groups for the refreshed tracker only — splice them in.
+      const refreshed: { tracker: any; entries: any[] }[] = data.trackers ?? [];
+      setTrackerGroups(prev => {
+        const refreshedById = new Map(refreshed.map(g => [g.tracker.id, g]));
+        return prev.map(g => refreshedById.get(g.tracker.id) ?? g);
+      });
+      toast.success(`Refreshed${refreshed[0] ? ` — ${refreshed[0].entries.length} entries` : ""}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Refresh failed");
+    } finally {
+      setRefreshingTrackerId(null);
+    }
+  };
+
   useEffect(() => {
     if (!id) return;
     const chatId = id;
@@ -1487,13 +1512,24 @@ const ChatDetail = () => {
                 icon={() => <span className="text-base">{group.tracker.icon ?? "📋"}</span>}
                 title={group.tracker.name}
                 count={group.entries.length}
+                action={
+                  <button
+                    onClick={() => refreshTracker(group.tracker.id)}
+                    disabled={refreshingTrackerId === group.tracker.id}
+                    className="text-xs text-muted-foreground hover:text-primary flex items-center gap-1 disabled:opacity-50"
+                    title="Re-extract entries from the last 24h of messages"
+                  >
+                    <RefreshCw className={`h-3 w-3 ${refreshingTrackerId === group.tracker.id ? "animate-spin" : ""}`} />
+                    {refreshingTrackerId === group.tracker.id ? "Refreshing…" : "Refresh"}
+                  </button>
+                }
               />
               {group.entries.length === 0 ? (
                 <p className="text-xs text-muted-foreground py-4 text-center">No entries found yet</p>
               ) : (
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto max-h-[280px] overflow-y-auto">
                   <table className="w-full text-xs mt-2">
-                    <thead>
+                    <thead className="sticky top-0 bg-background z-10">
                       <tr className="border-b border-border">
                         {group.tracker.fields.map((f: any) => (
                           <th key={f.name} className="text-left text-muted-foreground font-medium pb-2 pr-4">{f.name}</th>
@@ -1503,10 +1539,30 @@ const ChatDetail = () => {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
-                      {group.entries.slice(0, 20).map((entry: any) => {
+                      {group.entries.map((entry: any) => {
                         const isEditing = editingEntryId === entry.id;
+                        const onRowClick = () => {
+                          if (isEditing) return;
+                          // Build a search query out of the entry's text-like values so the
+                          // existing message-context modal can surface the originating msgs.
+                          const queryText = group.tracker.fields
+                            .map((f: any) => entry.data?.[f.name])
+                            .filter((v: any) => v != null && typeof v !== "boolean")
+                            .map((v: any) => String(v))
+                            .join(" ")
+                            .trim();
+                          if (!queryText) return;
+                          const firstField = group.tracker.fields.find((f: any) => entry.data?.[f.name] != null);
+                          const headline = firstField ? String(entry.data?.[firstField.name]).slice(0, 60) : group.tracker.name;
+                          openContext(`Source for "${headline}"`, { text: queryText });
+                        };
                         return (
-                        <tr key={entry.id} className="group hover:bg-muted/30 transition">
+                        <tr
+                          key={entry.id}
+                          onClick={onRowClick}
+                          className={`group hover:bg-muted/30 transition ${isEditing ? "" : "cursor-pointer"}`}
+                          title={isEditing ? undefined : "Click to see related messages"}
+                        >
                           {group.tracker.fields.map((f: any) => {
                             const val = isEditing ? editingData[f.name] : entry.data?.[f.name];
                             return (
@@ -1564,11 +1620,11 @@ const ChatDetail = () => {
                           <td className="py-2 text-muted-foreground">
                             {entry.extractedAt ? new Date(entry.extractedAt).toLocaleDateString("en-GB") : "—"}
                           </td>
-                          <td className="py-2">
+                          <td className="py-2" onClick={(e) => e.stopPropagation()}>
                             {isEditing ? (
                               <div className="flex items-center gap-1">
                                 <button
-                                  onClick={() => saveTrackerEntry(entry)}
+                                  onClick={(e) => { e.stopPropagation(); saveTrackerEntry(entry); }}
                                   disabled={savingEntry}
                                   title="Save"
                                   className="p-1 rounded text-green-600 hover:bg-green-500/10 disabled:opacity-40"
@@ -1576,7 +1632,7 @@ const ChatDetail = () => {
                                   {savingEntry ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
                                 </button>
                                 <button
-                                  onClick={cancelEditTrackerEntry}
+                                  onClick={(e) => { e.stopPropagation(); cancelEditTrackerEntry(); }}
                                   disabled={savingEntry}
                                   title="Cancel"
                                   className="p-1 rounded text-muted-foreground hover:bg-muted"
@@ -1587,14 +1643,14 @@ const ChatDetail = () => {
                             ) : (
                               <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
                                 <button
-                                  onClick={() => startEditTrackerEntry(entry)}
+                                  onClick={(e) => { e.stopPropagation(); startEditTrackerEntry(entry); }}
                                   title="Edit entry"
                                   className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted"
                                 >
                                   <Pencil className="h-3.5 w-3.5" />
                                 </button>
                                 <button
-                                  onClick={() => deleteTrackerEntry(entry)}
+                                  onClick={(e) => { e.stopPropagation(); deleteTrackerEntry(entry); }}
                                   title="Delete entry"
                                   className="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10"
                                 >
@@ -1608,9 +1664,6 @@ const ChatDetail = () => {
                       })}
                     </tbody>
                   </table>
-                  {group.entries.length > 20 && (
-                    <p className="text-xs text-muted-foreground text-center pt-2">+{group.entries.length - 20} more</p>
-                  )}
                 </div>
               )}
             </Card>
