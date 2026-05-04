@@ -5,9 +5,91 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Plus, Trash2, GripVertical, ChevronDown, ChevronUp } from "lucide-react";
+import { Plus, Trash2, GripVertical, Loader2, Sparkles, Wrench } from "lucide-react";
 import { toast } from "sonner";
 import { apiFetch } from "@/lib/api";
+
+// ─── Preset templates ─────────────────────────────────────────────────────────
+
+interface TrackerTemplate {
+  name: string;
+  icon: string;
+  description: string;
+  fields: TrackerField[];
+}
+
+const TEMPLATES: TrackerTemplate[] = [
+  {
+    name: "Deals",
+    icon: "💰",
+    description: "Sales opportunities discussed with customers",
+    fields: [
+      { name: "Customer", type: "text", required: true },
+      { name: "Company", type: "text", required: false },
+      { name: "Amount", type: "number", required: false },
+      { name: "Stage", type: "enum", options: ["Lead", "Qualified", "Proposal", "Closed-won", "Closed-lost"], required: false },
+      { name: "Owner", type: "text", required: false },
+    ],
+  },
+  {
+    name: "Support tickets",
+    icon: "🎫",
+    description: "Customer issues and their status",
+    fields: [
+      { name: "Customer", type: "text", required: true },
+      { name: "Issue", type: "text", required: true },
+      { name: "Priority", type: "enum", options: ["Low", "Medium", "High", "Urgent"], required: false },
+      { name: "Status", type: "enum", options: ["Open", "In Progress", "Waiting", "Resolved"], required: false },
+      { name: "Assignee", type: "text", required: false },
+    ],
+  },
+  {
+    name: "Leads",
+    icon: "🤝",
+    description: "Prospective customers in the funnel",
+    fields: [
+      { name: "Name", type: "text", required: true },
+      { name: "Company", type: "text", required: false },
+      { name: "Source", type: "text", required: false },
+      { name: "Stage", type: "enum", options: ["New", "Contacted", "Qualified", "Disqualified"], required: false },
+      { name: "Notes", type: "text", required: false },
+    ],
+  },
+  {
+    name: "Candidates",
+    icon: "👥",
+    description: "Job applicants and their hiring stage",
+    fields: [
+      { name: "Name", type: "text", required: true },
+      { name: "Role", type: "text", required: false },
+      { name: "Stage", type: "enum", options: ["Applied", "Screen", "Interview", "Offer", "Hired", "Rejected"], required: false },
+      { name: "Skills", type: "text", required: false },
+    ],
+  },
+  {
+    name: "Orders",
+    icon: "📦",
+    description: "Customer orders and fulfilment status",
+    fields: [
+      { name: "Customer", type: "text", required: true },
+      { name: "Product", type: "text", required: false },
+      { name: "Quantity", type: "number", required: false },
+      { name: "Status", type: "enum", options: ["Placed", "Paid", "Shipped", "Delivered", "Cancelled"], required: false },
+      { name: "Date", type: "date", required: false },
+    ],
+  },
+  {
+    name: "Bugs",
+    icon: "🐛",
+    description: "Bug reports surfacing in chat",
+    fields: [
+      { name: "Title", type: "text", required: true },
+      { name: "Severity", type: "enum", options: ["Low", "Medium", "High", "Critical"], required: false },
+      { name: "Reporter", type: "text", required: false },
+      { name: "Status", type: "enum", options: ["New", "Confirmed", "Fixed", "Wontfix"], required: false },
+    ],
+  },
+];
 
 export interface TrackerField {
   name: string;
@@ -179,11 +261,19 @@ function TrackerForm({
   );
 }
 
+type CreationStep =
+  | { kind: 'closed' }
+  | { kind: 'choose' }                                    // template / AI / scratch chooser
+  | { kind: 'ai' }                                         // describe-it text input
+  | { kind: 'editing'; initial?: Partial<Tracker> };       // TrackerForm with optional preset
+
 export function TrackerBuilderTab() {
   const [trackers, setTrackers] = useState<Tracker[]>([]);
   const [loaded, setLoaded] = useState(false);
-  const [creating, setCreating] = useState(false);
+  const [creation, setCreation] = useState<CreationStep>({ kind: 'closed' });
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [aiDescription, setAiDescription] = useState("");
+  const [aiGenerating, setAiGenerating] = useState(false);
 
   const load = async () => {
     const res = await apiFetch("/api/trackers").catch(() => null);
@@ -198,8 +288,31 @@ export function TrackerBuilderTab() {
       const idx = prev.findIndex(t => t.id === tracker.id);
       return idx >= 0 ? prev.map(t => t.id === tracker.id ? tracker : t) : [...prev, tracker];
     });
-    setCreating(false);
+    setCreation({ kind: 'closed' });
     setEditingId(null);
+  };
+
+  const generateFromAI = async () => {
+    if (!aiDescription.trim() || aiDescription.trim().length < 5) {
+      toast.error("Describe what you want to track in a sentence or two.");
+      return;
+    }
+    setAiGenerating(true);
+    try {
+      const res = await apiFetch("/api/trackers/generate", {
+        method: "POST",
+        body: JSON.stringify({ description: aiDescription.trim() }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.message || "AI generation failed");
+      // Drop into the editing form pre-populated; user reviews and clicks save.
+      setCreation({ kind: 'editing', initial: data.tracker });
+      setAiDescription("");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "AI generation failed");
+    } finally {
+      setAiGenerating(false);
+    }
   };
 
   const handleDelete = async (id: string) => {
@@ -226,16 +339,88 @@ export function TrackerBuilderTab() {
         <div>
           <p className="text-sm text-muted-foreground">Tell the AI what to track. Every daily summary will automatically extract matching entries from your chats.</p>
         </div>
-        {!creating && (
-          <Button className="gradient-primary border-0 h-8 text-sm" onClick={() => setCreating(true)}>
+        {creation.kind === 'closed' && (
+          <Button className="gradient-primary border-0 h-8 text-sm" onClick={() => setCreation({ kind: 'choose' })}>
             <Plus className="h-4 w-4 mr-1" /> New tracker
           </Button>
         )}
       </div>
 
-      {creating && <TrackerForm onSave={handleSaved} onCancel={() => setCreating(false)} />}
+      {/* Chooser: template / AI / scratch */}
+      {creation.kind === 'choose' && (
+        <div className="border border-primary/30 rounded-xl p-4 space-y-4 bg-primary/5">
+          <div className="flex items-center justify-between">
+            <p className="font-medium text-sm">How do you want to start?</p>
+            <Button variant="ghost" size="sm" className="h-7" onClick={() => setCreation({ kind: 'closed' })}>Cancel</Button>
+          </div>
 
-      {trackers.length === 0 && !creating && (
+          <div>
+            <p className="text-xs text-muted-foreground mb-2 uppercase tracking-wide">Pick a template</p>
+            <div className="grid grid-cols-2 gap-2">
+              {TEMPLATES.map(t => (
+                <button
+                  key={t.name}
+                  className="text-left p-3 rounded-lg border border-border bg-background hover:border-primary/50 hover:bg-primary/5 transition"
+                  onClick={() => setCreation({ kind: 'editing', initial: { name: t.name, icon: t.icon, description: t.description, fields: t.fields } })}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl">{t.icon}</span>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">{t.name}</p>
+                      <p className="text-xs text-muted-foreground truncate">{t.description}</p>
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="border-t pt-3 flex flex-col sm:flex-row gap-2">
+            <Button variant="outline" className="flex-1 h-8 text-sm" onClick={() => setCreation({ kind: 'ai' })}>
+              <Sparkles className="h-3.5 w-3.5 mr-1" /> Describe in plain English
+            </Button>
+            <Button variant="outline" className="flex-1 h-8 text-sm" onClick={() => setCreation({ kind: 'editing' })}>
+              <Wrench className="h-3.5 w-3.5 mr-1" /> Build from scratch
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* AI describe-it text input */}
+      {creation.kind === 'ai' && (
+        <div className="border border-primary/30 rounded-xl p-4 space-y-3 bg-primary/5">
+          <div className="flex items-center justify-between">
+            <p className="font-medium text-sm flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-primary" /> Describe what you want to track
+            </p>
+            <Button variant="ghost" size="sm" className="h-7" onClick={() => setCreation({ kind: 'choose' })}>Back</Button>
+          </div>
+          <textarea
+            value={aiDescription}
+            onChange={(e) => setAiDescription(e.target.value)}
+            placeholder="e.g. I want to track sales deals between us and customers — I care about company, amount, who owns it, and current stage."
+            rows={4}
+            className="w-full text-sm rounded-lg border border-border bg-background px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-primary/30"
+            disabled={aiGenerating}
+          />
+          <div className="flex gap-2">
+            <Button onClick={generateFromAI} disabled={aiGenerating || !aiDescription.trim()} className="gradient-primary border-0 h-8 text-sm">
+              {aiGenerating ? <><Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> Generating…</> : <><Sparkles className="h-3.5 w-3.5 mr-1" /> Generate tracker</>}
+            </Button>
+            <Button variant="ghost" className="h-8 text-sm" onClick={() => { setAiDescription(""); setCreation({ kind: 'choose' }); }} disabled={aiGenerating}>Cancel</Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            The AI will draft a tracker schema from your description. You can review and tweak everything before saving.
+          </p>
+        </div>
+      )}
+
+      {/* TrackerForm — used for both new (with optional initial prefill) and editing */}
+      {creation.kind === 'editing' && (
+        <TrackerForm initial={creation.initial} onSave={handleSaved} onCancel={() => setCreation({ kind: 'closed' })} />
+      )}
+
+      {trackers.length === 0 && creation.kind === 'closed' && (
         <div className="text-center py-12 text-muted-foreground border border-dashed rounded-xl">
           <p className="text-2xl mb-2">📋</p>
           <p className="text-sm">No trackers yet. Create one to start extracting structured data from your chats.</p>
