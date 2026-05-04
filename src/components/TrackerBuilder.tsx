@@ -96,6 +96,7 @@ export interface TrackerField {
   type: "text" | "number" | "boolean" | "enum" | "date";
   options?: string[];
   required?: boolean;
+  description?: string;
 }
 
 export interface Tracker {
@@ -184,6 +185,16 @@ function FieldRow({
           </div>
         </div>
       )}
+
+      {/* Hint to AI — disambiguates ambiguous field names like "User" or "Company". */}
+      <div className="pl-6">
+        <Input
+          placeholder="Hint to the AI (optional) — e.g. 'the 3-digit code at the start of the message'"
+          value={field.description ?? ""}
+          onChange={e => onChange(index, { ...field, description: e.target.value })}
+          className="h-7 text-xs"
+        />
+      </div>
     </div>
   );
 }
