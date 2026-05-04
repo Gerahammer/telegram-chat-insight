@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Plus, Trash2, GripVertical, Loader2, Sparkles, Wrench } from "lucide-react";
+import { Plus, Trash2, GripVertical, Loader2, Sparkles, Wrench, ChevronUp, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import { apiFetch } from "@/lib/api";
 
@@ -120,18 +120,39 @@ const FIELD_TYPES = [
 const ICONS = ["📋", "🤝", "💰", "⚠️", "🎯", "📌", "🔔", "💡", "🚀", "👥", "📊", "🔑"];
 
 function FieldRow({
-  field, index, onChange, onRemove,
+  field, index, total, onChange, onRemove, onMove,
 }: {
-  field: TrackerField; index: number;
+  field: TrackerField; index: number; total: number;
   onChange: (i: number, f: TrackerField) => void;
   onRemove: (i: number) => void;
+  onMove: (from: number, to: number) => void;
 }) {
   const [optionInput, setOptionInput] = useState("");
+  const canMoveUp = index > 0;
+  const canMoveDown = index < total - 1;
 
   return (
     <div className="border border-border rounded-lg p-3 space-y-2 bg-muted/30">
       <div className="flex items-center gap-2">
-        <GripVertical className="h-4 w-4 text-muted-foreground shrink-0" />
+        <div className="flex flex-col items-center shrink-0 -my-1" title="Reorder">
+          <button
+            onClick={() => canMoveUp && onMove(index, index - 1)}
+            disabled={!canMoveUp}
+            className="p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed"
+            title="Move up"
+          >
+            <ChevronUp className="h-3 w-3" />
+          </button>
+          <GripVertical className="h-3 w-3 text-muted-foreground/60" />
+          <button
+            onClick={() => canMoveDown && onMove(index, index + 1)}
+            disabled={!canMoveDown}
+            className="p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed"
+            title="Move down"
+          >
+            <ChevronDown className="h-3 w-3" />
+          </button>
+        </div>
         <Input
           placeholder="Field name (e.g. Company)"
           value={field.name}
@@ -215,6 +236,13 @@ function TrackerForm({
   const updateField = (i: number, f: TrackerField) => setFields(prev => prev.map((x, idx) => idx === i ? f : x));
   const removeField = (i: number) => setFields(prev => prev.filter((_, idx) => idx !== i));
   const addField = () => setFields(prev => [...prev, { name: "", type: "text", required: false }]);
+  const moveField = (from: number, to: number) => setFields(prev => {
+    if (to < 0 || to >= prev.length || from === to) return prev;
+    const next = [...prev];
+    const [item] = next.splice(from, 1);
+    next.splice(to, 0, item);
+    return next;
+  });
 
   const handleSave = async () => {
     if (!name.trim()) { toast.error("Tracker name is required"); return; }
@@ -255,7 +283,15 @@ function TrackerForm({
       <div className="space-y-2">
         <Label className="text-xs text-muted-foreground uppercase tracking-wide">Fields</Label>
         {fields.map((f, i) => (
-          <FieldRow key={i} field={f} index={i} onChange={updateField} onRemove={removeField} />
+          <FieldRow
+            key={i}
+            field={f}
+            index={i}
+            total={fields.length}
+            onChange={updateField}
+            onRemove={removeField}
+            onMove={moveField}
+          />
         ))}
         <button onClick={addField} className="flex items-center gap-1 text-xs text-primary hover:underline">
           <Plus className="h-3 w-3" /> Add field
