@@ -11,12 +11,14 @@ import {
   HelpCircle, Flag, Inbox, Loader2, RefreshCw, Calendar, Star,
   ChevronDown, Clock, CheckCircle2, AlertTriangle, Activity,
   GitCommit, Handshake, Lightbulb, Target, Trophy, XCircle,
-  ChevronRight, ThumbsUp, ThumbsDown, Brain, Copy,
+  ChevronRight, ThumbsUp, ThumbsDown, Brain, Copy, Pencil, Trash2, Check, X,
 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { ChatPhoto } from "@/components/ChatPhoto";
 import { toast } from "sonner";
 import type { Chat, ActionItem, Message } from "@/lib/mock-data";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -468,6 +470,54 @@ const ChatDetail = () => {
     setContextModal({ title, messages: msgs });
   };
   const [trackerGroups, setTrackerGroups] = useState<{ tracker: { id: string; name: string; icon?: string; fields: any[] }; entries: any[] }[]>([]);
+  const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
+  const [editingData, setEditingData] = useState<Record<string, any>>({});
+  const [savingEntry, setSavingEntry] = useState(false);
+
+  const startEditTrackerEntry = (entry: any) => {
+    setEditingEntryId(entry.id);
+    setEditingData({ ...(entry.data ?? {}) });
+  };
+  const cancelEditTrackerEntry = () => {
+    setEditingEntryId(null);
+    setEditingData({});
+  };
+  const saveTrackerEntry = async (entry: any) => {
+    setSavingEntry(true);
+    try {
+      const res = await apiFetch(`/api/trackers/entries/${entry.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ data: editingData }),
+      });
+      if (!res.ok) throw new Error();
+      // Update locally — replace the entry's data with what we saved.
+      setTrackerGroups(prev => prev.map(g => ({
+        ...g,
+        entries: g.entries.map(e => e.id === entry.id ? { ...e, data: editingData } : e),
+      })));
+      setEditingEntryId(null);
+      setEditingData({});
+      toast.success("Entry updated");
+    } catch {
+      toast.error("Failed to save changes");
+    } finally {
+      setSavingEntry(false);
+    }
+  };
+  const deleteTrackerEntry = async (entry: any) => {
+    if (!confirm("Delete this entry? This can't be undone.")) return;
+    try {
+      const res = await apiFetch(`/api/trackers/entries/${entry.id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error();
+      setTrackerGroups(prev => prev.map(g => ({
+        ...g,
+        entries: g.entries.filter(e => e.id !== entry.id),
+      })));
+      toast.success("Entry removed");
+    } catch {
+      toast.error("Failed to delete entry");
+    }
+  };
 
   useEffect(() => {
     if (!id) return;
@@ -1449,16 +1499,57 @@ const ChatDetail = () => {
                           <th key={f.name} className="text-left text-muted-foreground font-medium pb-2 pr-4">{f.name}</th>
                         ))}
                         <th className="text-left text-muted-foreground font-medium pb-2">Date</th>
+                        <th className="w-16" />
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
-                      {group.entries.slice(0, 20).map((entry: any) => (
-                        <tr key={entry.id} className="hover:bg-muted/30 transition">
+                      {group.entries.slice(0, 20).map((entry: any) => {
+                        const isEditing = editingEntryId === entry.id;
+                        return (
+                        <tr key={entry.id} className="group hover:bg-muted/30 transition">
                           {group.tracker.fields.map((f: any) => {
-                            const val = entry.data?.[f.name];
+                            const val = isEditing ? editingData[f.name] : entry.data?.[f.name];
                             return (
-                              <td key={f.name} className="py-2 pr-4">
-                                {val === null || val === undefined ? (
+                              <td key={f.name} className="py-2 pr-4 align-middle">
+                                {isEditing ? (
+                                  f.type === "enum" ? (
+                                    <Select
+                                      value={val == null ? "" : String(val)}
+                                      onValueChange={(v) => setEditingData(d => ({ ...d, [f.name]: v }))}
+                                    >
+                                      <SelectTrigger className="h-7 text-xs"><SelectValue placeholder="—" /></SelectTrigger>
+                                      <SelectContent>
+                                        {(f.options ?? []).map((opt: string) => (
+                                          <SelectItem key={opt} value={opt} className="text-xs">{opt}</SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  ) : f.type === "boolean" ? (
+                                    <Select
+                                      value={val === true ? "yes" : val === false ? "no" : ""}
+                                      onValueChange={(v) => setEditingData(d => ({ ...d, [f.name]: v === "yes" ? true : v === "no" ? false : null }))}
+                                    >
+                                      <SelectTrigger className="h-7 text-xs"><SelectValue placeholder="—" /></SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="yes" className="text-xs">Yes</SelectItem>
+                                        <SelectItem value="no" className="text-xs">No</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                  ) : (
+                                    <Input
+                                      type={f.type === "number" ? "number" : f.type === "date" ? "date" : "text"}
+                                      value={val == null ? "" : String(val)}
+                                      onChange={(e) => {
+                                        const raw = e.target.value;
+                                        setEditingData(d => ({
+                                          ...d,
+                                          [f.name]: raw === "" ? null : f.type === "number" ? Number(raw) : raw,
+                                        }));
+                                      }}
+                                      className="h-7 text-xs"
+                                    />
+                                  )
+                                ) : val === null || val === undefined ? (
                                   <span className="text-muted-foreground">—</span>
                                 ) : typeof val === "boolean" ? (
                                   <span className={val ? "text-green-500" : "text-muted-foreground"}>{val ? "Yes" : "No"}</span>
@@ -1473,8 +1564,48 @@ const ChatDetail = () => {
                           <td className="py-2 text-muted-foreground">
                             {entry.extractedAt ? new Date(entry.extractedAt).toLocaleDateString("en-GB") : "—"}
                           </td>
+                          <td className="py-2">
+                            {isEditing ? (
+                              <div className="flex items-center gap-1">
+                                <button
+                                  onClick={() => saveTrackerEntry(entry)}
+                                  disabled={savingEntry}
+                                  title="Save"
+                                  className="p-1 rounded text-green-600 hover:bg-green-500/10 disabled:opacity-40"
+                                >
+                                  {savingEntry ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                                </button>
+                                <button
+                                  onClick={cancelEditTrackerEntry}
+                                  disabled={savingEntry}
+                                  title="Cancel"
+                                  className="p-1 rounded text-muted-foreground hover:bg-muted"
+                                >
+                                  <X className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
+                                <button
+                                  onClick={() => startEditTrackerEntry(entry)}
+                                  title="Edit entry"
+                                  className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted"
+                                >
+                                  <Pencil className="h-3.5 w-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => deleteTrackerEntry(entry)}
+                                  title="Delete entry"
+                                  className="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
+                            )}
+                          </td>
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                   </table>
                   {group.entries.length > 20 && (
