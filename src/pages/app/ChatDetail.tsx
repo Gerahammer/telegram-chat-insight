@@ -654,12 +654,19 @@ const ChatDetail = () => {
     (async () => {
       try {
         const res = await apiFetch(`/api/chats/${encodeURIComponent(id)}/summaries?limit=60`);
-        if (!res.ok) { if (!cancelled) setData(p => p ? { ...p, summaries: [] } : p); return; }
+        if (!res.ok) { if (!cancelled) setData(p => p ? { ...p, summaries: [], personalHighlights: [] } : p); return; }
         const json: any = await res.json();
         const all: SummaryData[] = Array.isArray(json) ? json : (json?.summaries ?? []);
         const filtered = all.filter(s => { const d = s.date?.slice(0, 10) ?? ""; return d >= dateFrom && d <= dateTo; });
-        if (!cancelled) setData(p => p ? { ...p, summaries: filtered } : p);
-      } catch { if (!cancelled) setData(p => p ? { ...p, summaries: [] } : p); }
+        // Personal highlights aren't a top-level column on DailySummary — they live
+        // inside rawAiResponse. Pull them out of the most recent (today's) summary
+        // so the "For you" card persists across page reloads.
+        const latest = filtered[0] as any;
+        const persisted: PersonalHighlight[] = (latest?.rawAiResponse?.personalHighlights ?? []).filter(
+          (h: any) => h && typeof h.message === "string"
+        );
+        if (!cancelled) setData(p => p ? { ...p, summaries: filtered, personalHighlights: persisted } : p);
+      } catch { if (!cancelled) setData(p => p ? { ...p, summaries: [], personalHighlights: [] } : p); }
       finally { if (!cancelled) setSummaryLoading(false); }
     })();
     return () => { cancelled = true; };
@@ -698,11 +705,12 @@ const ChatDetail = () => {
     };
   }, [id]);
 
-  const handleGenerate = async (force = false) => {
+  const handleGenerate = async (_force = true) => {
     if (!id || generating) return;
     setGenerating(true);
     try {
-      const res = await apiFetch(`/api/chats/${encodeURIComponent(id)}/generate-summary${force ? "?force=true" : ""}`, { method: "POST" });
+      // Always bypass the cooldown — this button is user-intent, not cron noise.
+      const res = await apiFetch(`/api/chats/${encodeURIComponent(id)}/generate-summary?force=true`, { method: "POST" });
       let body: any = null;
       try { const t = await res.text(); body = t ? JSON.parse(t) : null; } catch {}
       if (!res.ok) {
