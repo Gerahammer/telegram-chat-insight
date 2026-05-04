@@ -530,13 +530,31 @@ const ChatDetail = () => {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.message || "Refresh failed");
-      // Server returns groups for the refreshed tracker only — splice them in.
+
+      // Server now always echoes the targeted tracker(s) — even with 0 entries —
+      // so we replace the matching group(s) in local state from the response.
       const refreshed: { tracker: any; entries: any[] }[] = data.trackers ?? [];
       setTrackerGroups(prev => {
         const refreshedById = new Map(refreshed.map(g => [g.tracker.id, g]));
-        return prev.map(g => refreshedById.get(g.tracker.id) ?? g);
+        // Update existing groups that match, AND add any tracker that wasn't in
+        // local state before but now has entries (rare but possible).
+        const updated = prev.map(g => refreshedById.get(g.tracker.id) ?? g);
+        const existingIds = new Set(prev.map(g => g.tracker.id));
+        for (const g of refreshed) {
+          if (!existingIds.has(g.tracker.id) && g.entries.length > 0) updated.push(g);
+        }
+        return updated;
       });
-      toast.success(`Refreshed${refreshed[0] ? ` — ${refreshed[0].entries.length} entries` : ""}`);
+
+      const replaced = data.replacedCount ?? 0;
+      const target = refreshed[0];
+      if (replaced === 0) {
+        toast.info(target && target.entries.length > 0
+          ? "Refreshed — AI didn't find new matches; kept existing entries."
+          : "AI didn't find anything to extract from the last 24h.");
+      } else {
+        toast.success(`Refreshed — ${target?.entries.length ?? 0} entries`);
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Refresh failed");
     } finally {
