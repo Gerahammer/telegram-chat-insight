@@ -1193,6 +1193,13 @@ const ChatDetail = () => {
                     const qt = getQuestionText(u.q);
                     return qt && text.toLowerCase().startsWith(qt.toLowerCase().slice(0, 25));
                   });
+                  // Lightweight "no reply yet" check: messages are sorted newest-first, so any
+                  // index < i is later in time. If no later message comes from a different
+                  // sender, this question is still waiting for someone to respond. We exclude
+                  // questions already flagged as business-critical (Unanswered) so we don't
+                  // double-up indicators.
+                  const hasLaterReply = isQ && messages.slice(0, i).some(later => later.author !== m.author);
+                  const awaitingReply = isQ && !isUnans && !hasLaterReply;
                   acc.push(
                     <div key={m.id} className="flex gap-3">
                       <UserAvatar name={m.author} size="md" />
@@ -1204,7 +1211,19 @@ const ChatDetail = () => {
                           </span>
                           {isUnans && <span className="px-1.5 py-0.5 rounded-full bg-warning/10 text-warning text-xs">Unanswered</span>}
                           {isCom && !isUnans && <span className="px-1.5 py-0.5 rounded-full bg-blue-500/10 text-blue-500 text-xs">Commitment</span>}
-                          {isQ && !isUnans && !isCom && <span className="px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground text-xs">Question</span>}
+                          {isQ && !isUnans && !isCom && (
+                            awaitingReply ? (
+                              <span
+                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-muted-foreground/10 text-muted-foreground text-xs"
+                                title="Question — no reply has come in yet"
+                              >
+                                <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                                Awaiting reply
+                              </span>
+                            ) : (
+                              <span className="px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground text-xs">Question</span>
+                            )
+                          )}
                         </div>
                         {(() => {
                           const txt = m.text ?? "";
