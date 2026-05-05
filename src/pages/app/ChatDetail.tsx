@@ -180,20 +180,30 @@ function findRelatedMessages(messages: Message[], query: MsgContextQuery): Score
     let keywordScore = 0;
     let personMatch = false;
     let bonusScore = 0;
+    let distinctiveHits = 0; // count of long/specific tokens that matched
     const msgText = m.text.toLowerCase();
 
     if (query.text) {
       const queryLower = query.text.toLowerCase();
       // Exact phrase match for first meaningful chunk
       const keyPhrase = queryLower.replace(/^[^a-z]+/, "").slice(0, 30);
-      if (keyPhrase.length > 8 && msgText.includes(keyPhrase)) keywordScore += 8;
-      // Keyword matching with stop words and length filter
-      const words = queryLower.split(/\s+/).filter(w => w.length > 4 && !STOP_WORDS.has(w) && /^[a-z]/.test(w));
-      keywordScore += words.filter(w => msgText.includes(w)).length * 2;
-      // Loosen for short identifiers (numbers, codes like "044", "EUR") that the
-      // length filter would otherwise drop. These are exactly the tokens tracker
-      // entries care about.
-      const shortTokens = queryLower.split(/[^A-Za-z0-9]+/).filter(w => w.length >= 2 && w.length <= 4 && /^[A-Za-z0-9]+$/.test(w) && !STOP_WORDS.has(w));
+      if (keyPhrase.length > 8 && msgText.includes(keyPhrase)) {
+        keywordScore += 8;
+        distinctiveHits++;
+      }
+      // Long words (>=6 chars): heavily weighted — these are usually the
+      // distinctive tokens (brand names, product slugs, partner names) that
+      // identify a specific entry.
+      const longWords = queryLower.split(/\s+/).filter(w => w.length >= 6 && !STOP_WORDS.has(w) && /^[a-z]/.test(w));
+      const longHits = longWords.filter(w => msgText.includes(w));
+      keywordScore += longHits.length * 5;
+      distinctiveHits += longHits.length;
+      // Medium words (4-5 chars)
+      const medWords = queryLower.split(/\s+/).filter(w => w.length >= 4 && w.length < 6 && !STOP_WORDS.has(w) && /^[a-z]/.test(w));
+      keywordScore += medWords.filter(w => msgText.includes(w)).length * 2;
+      // Short identifiers (numbers/codes like "044", "EUR"): contribute, but
+      // worth little — they're rarely unique to a single entry.
+      const shortTokens = queryLower.split(/[^A-Za-z0-9]+/).filter(w => w.length >= 2 && w.length <= 3 && /^[A-Za-z0-9]+$/.test(w) && !STOP_WORDS.has(w));
       keywordScore += shortTokens.filter(w => msgText.includes(w)).length;
     }
 
@@ -216,14 +226,17 @@ function findRelatedMessages(messages: Message[], query: MsgContextQuery): Score
       }
     }
 
-    return { idx, keywordScore, personMatch, score: keywordScore + bonusScore };
+    return { idx, keywordScore, personMatch, distinctiveHits, score: keywordScore + bonusScore };
   });
 
-  // Qualification: either two keyword hits OR an author match (with at least
-  // one weak keyword hit OR no text query at all). This makes tracker-row
-  // clicks useful — the entry's "Sent by" field becomes a real anchor.
+  // Qualification rules — tightened so tracker-row clicks don't return every
+  // message from the matching author. A message must EITHER:
+  // - Match a phrase or 2+ long/distinctive tokens (independent of author), OR
+  // - Match the author AND at least one distinctive token (brand name etc.)
+  // Pure short-token + author match no longer qualifies — it was matching
+  // every Maria-authored message because "EUR" or "10/10" appears in all.
   const matched = scores
-    .filter(x => x.keywordScore >= 4 || (x.personMatch && (x.keywordScore >= 1 || !query.text)))
+    .filter(x => x.distinctiveHits >= 2 || (x.personMatch && x.distinctiveHits >= 1) || (!query.text && x.personMatch))
     .sort((a, b) => b.score - a.score)
     .slice(0, 5);
 
