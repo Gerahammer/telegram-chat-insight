@@ -178,6 +178,7 @@ function findRelatedMessages(messages: Message[], query: MsgContextQuery): Score
 
   const scores = messages.map((m, idx) => {
     let keywordScore = 0;
+    let personMatch = false;
     let bonusScore = 0;
     const msgText = m.text.toLowerCase();
 
@@ -189,13 +190,20 @@ function findRelatedMessages(messages: Message[], query: MsgContextQuery): Score
       // Keyword matching with stop words and length filter
       const words = queryLower.split(/\s+/).filter(w => w.length > 4 && !STOP_WORDS.has(w) && /^[a-z]/.test(w));
       keywordScore += words.filter(w => msgText.includes(w)).length * 2;
+      // Loosen for short identifiers (numbers, codes like "044", "EUR") that the
+      // length filter would otherwise drop. These are exactly the tokens tracker
+      // entries care about.
+      const shortTokens = queryLower.split(/[^A-Za-z0-9]+/).filter(w => w.length >= 2 && w.length <= 4 && /^[A-Za-z0-9]+$/.test(w) && !STOP_WORDS.has(w));
+      keywordScore += shortTokens.filter(w => msgText.includes(w)).length;
     }
 
-    // Person and time are bonuses only — they cannot qualify a message on their own
     if (query.person) {
-      const nameParts = query.person.toLowerCase().split(/\s+/);
+      const nameParts = query.person.toLowerCase().split(/[\s|@()]+/).filter(Boolean);
       const authorLower = m.author.toLowerCase();
-      if (nameParts.some(p => p.length > 2 && authorLower.includes(p))) bonusScore += 2;
+      if (nameParts.some(p => p.length > 2 && authorLower.includes(p))) {
+        personMatch = true;
+        bonusScore += 4;
+      }
     }
 
     if (query.time && m.time) {
@@ -208,12 +216,14 @@ function findRelatedMessages(messages: Message[], query: MsgContextQuery): Score
       }
     }
 
-    return { idx, keywordScore, score: keywordScore + bonusScore };
+    return { idx, keywordScore, personMatch, score: keywordScore + bonusScore };
   });
 
-  // Must have at least two keyword matches to qualify — single-word overlap is not enough
+  // Qualification: either two keyword hits OR an author match (with at least
+  // one weak keyword hit OR no text query at all). This makes tracker-row
+  // clicks useful — the entry's "Sent by" field becomes a real anchor.
   const matched = scores
-    .filter(x => x.keywordScore >= 4)
+    .filter(x => x.keywordScore >= 4 || (x.personMatch && (x.keywordScore >= 1 || !query.text)))
     .sort((a, b) => b.score - a.score)
     .slice(0, 5);
 
@@ -1569,18 +1579,36 @@ const ChatDetail = () => {
                         const isEditing = editingEntryId === entry.id;
                         const onRowClick = () => {
                           if (isEditing) return;
-                          // Build a search query out of the entry's text-like values so the
-                          // existing message-context modal can surface the originating msgs.
+                          // Detect a sender-style field so we can pass it as `person` to the
+                          // matcher — this is the strongest signal for "which message did
+                          // this entry come from?", since text fields like Customer/Company
+                          // rarely appear inside the message body.
+                          const SENDER_FIELD_RE = /sent\s*by|sender|author|reporter|requester|raised\s*by|created\s*by|^user$|^by$/i;
+                          const senderField = group.tracker.fields.find((f: any) =>
+                            f && typeof f.name === "string" && SENDER_FIELD_RE.test(f.name)
+                          );
+                          const senderValue = senderField ? entry.data?.[senderField.name] : null;
+
+                          // Remaining text-like values become the keyword query for ranking.
                           const queryText = group.tracker.fields
+                            .filter((f: any) => f !== senderField)
                             .map((f: any) => entry.data?.[f.name])
                             .filter((v: any) => v != null && typeof v !== "boolean")
                             .map((v: any) => String(v))
                             .join(" ")
                             .trim();
-                          if (!queryText) return;
+
+                          if (!queryText && !senderValue) return;
+
                           const firstField = group.tracker.fields.find((f: any) => entry.data?.[f.name] != null);
                           const headline = firstField ? String(entry.data?.[firstField.name]).slice(0, 60) : group.tracker.name;
-                          openContext(`Source for "${headline}"`, { text: queryText });
+                          openContext(
+                            `Source for "${headline}"`,
+                            {
+                              text: queryText || undefined,
+                              person: senderValue ? String(senderValue) : undefined,
+                            }
+                          );
                         };
                         return (
                         <tr
