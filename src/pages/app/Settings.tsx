@@ -656,18 +656,36 @@ const Settings = () => {
         <TabsContent value="ai" className="mt-6">
           <Card className="p-6 space-y-4 max-w-xl">
             <div className="space-y-2">
-              <Label>Daily summary time (UTC)</Label>
-              <Select
-                value={settings.summaryTime ?? "08:00"}
-                onValueChange={(v) => setSettings(s => ({ ...s, summaryTime: v }))}
-              >
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {["06:00","07:00","08:00","09:00","10:00","12:00","18:00","20:00"].map(t => (
-                    <SelectItem key={t} value={t}>{t} UTC</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {(() => {
+                // Show the chosen timezone in the label so we don't lie. The
+                // server already runs the daily-digest cron timezone-aware:
+                // each company's summaryTime is interpreted in its own
+                // CompanySettings.timezone, not UTC.
+                const tz = settings.timezone ?? "UTC";
+                const tzShort = tz === "UTC" ? "UTC"
+                  : tz === "Europe/Berlin" ? "CET"
+                  : tz === "Europe/London" ? "GMT"
+                  : tz === "America/New_York" ? "EST"
+                  : tz === "Asia/Singapore" ? "SGT"
+                  : tz;
+                return (
+                  <>
+                    <Label>Daily summary time ({tzShort})</Label>
+                    <Select
+                      value={settings.summaryTime ?? "08:00"}
+                      onValueChange={(v) => setSettings(s => ({ ...s, summaryTime: v }))}
+                    >
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {["06:00","07:00","08:00","09:00","10:00","12:00","18:00","20:00"].map(t => (
+                          <SelectItem key={t} value={t}>{t} {tzShort}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">Time is in your selected timezone — change it below if needed.</p>
+                  </>
+                );
+              })()}
             </div>
             <div className="space-y-2">
               <Label>Timezone</Label>
