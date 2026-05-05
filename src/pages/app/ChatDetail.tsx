@@ -557,13 +557,15 @@ const ChatDetail = () => {
       });
 
       const replaced = data.replacedCount ?? 0;
+      const removed = data.removedDuplicates ?? 0;
       const target = refreshed[0];
+      const dedupeNote = removed > 0 ? ` (cleaned ${removed} duplicate${removed === 1 ? "" : "s"})` : "";
       if (replaced === 0) {
         toast.info(target && target.entries.length > 0
-          ? "Refreshed — AI didn't find new matches; kept existing entries."
-          : "AI didn't find anything to extract from the last 24h.");
+          ? `Refreshed — AI didn't find new matches; kept existing entries${dedupeNote}.`
+          : `AI didn't find anything to extract from the last 24h${dedupeNote}.`);
       } else {
-        toast.success(`Refreshed — ${target?.entries.length ?? 0} entries`);
+        toast.success(`Refreshed — ${target?.entries.length ?? 0} entries${dedupeNote}`);
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Refresh failed");
