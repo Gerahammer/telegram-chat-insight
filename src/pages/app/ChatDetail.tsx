@@ -1313,7 +1313,10 @@ const ChatDetail = () => {
                     acc.push(<div key={"sep"+i} className="flex items-center gap-2 my-1"><div className="flex-1 h-px bg-border"/><span className="text-xs text-muted-foreground shrink-0 px-2">{msgDate}</span><div className="flex-1 h-px bg-border"/></div>);
                   }
                   const text = m.text ?? "";
-                  const isQ = text.includes("?");
+                  // Strip URLs before checking for `?` so a bare link like
+                  // https://docs.google.com/.../edit?usp=sharing isn't flagged
+                  // as a question by the URL's query-string `?`.
+                  const isQ = text.replace(/https?:\/\/\S+/g, '').includes("?");
                   const isCom = /\b(i will|i'll|will do|tomorrow|by monday|by tuesday|by friday|by \d)\b/i.test(text);
                   const isUnans = allUnanswered.some(u => {
                     const qt = getQuestionText(u.q);
