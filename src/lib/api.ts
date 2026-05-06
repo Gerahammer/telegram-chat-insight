@@ -1,6 +1,6 @@
 // Centralized API configuration.
 // All API calls in the app should go through this base URL.
-export const API_BASE_URL = "https://seahorse-app-47666.ondigitalocean.app";
+export const API_BASE_URL = "https://replyradar-backend-gqsm6.ondigitalocean.app";
 
 const TOKEN_STORAGE_KEY = "jwtToken";
 

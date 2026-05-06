@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Hash } from "lucide-react";
 
-const API_BASE = import.meta.env.VITE_API_URL || "https://seahorse-app-47666.ondigitalocean.app";
+const API_BASE = import.meta.env.VITE_API_URL || "https://replyradar-backend-gqsm6.ondigitalocean.app";
 const LEGACY_PROXY = API_BASE + "/api/proxy/image";
 
 interface ChatPhotoProps {
