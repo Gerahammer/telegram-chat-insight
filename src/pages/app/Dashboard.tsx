@@ -9,8 +9,9 @@ import { SentimentBadge, TimeAgo } from "@/components/Badges";
 import {
   MessagesSquare, AlertTriangle, MoonStar, ListTodo,
   MessageSquare, ArrowRight, Inbox, GitCommit, Activity,
-  CheckCircle2, XCircle, TrendingUp,
+  CheckCircle2, XCircle, TrendingUp, Plus,
 } from "lucide-react";
+import { ConnectChatDialog } from "@/components/ConnectChatDialog";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis,
   Tooltip, CartesianGrid, AreaChart, Area,
@@ -95,6 +96,7 @@ const Dashboard = () => {
   const [me, setMe] = useState<MeResponse | null>(null);
   const [stats, setStats] = useState<OverviewStats | null>(null);
   const [chats, setChats] = useState<ApiChat[]>([]);
+  const [addChatOpen, setAddChatOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -147,12 +149,34 @@ const Dashboard = () => {
   return (
     <div className="space-y-6 max-w-[1400px] mx-auto">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
-          {loading ? "Loading…" : `${greeting}, ${userName} 👋`}
-        </h1>
-        <p className="text-muted-foreground mt-1">Here's what's happening across your Telegram chats today.</p>
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
+            {loading ? "Loading…" : `${greeting}, ${userName} 👋`}
+          </h1>
+          <p className="text-muted-foreground mt-1">Here's what's happening across your Telegram chats today.</p>
+        </div>
+        <Button onClick={() => setAddChatOpen(true)} className="gradient-primary border-0">
+          <Plus className="h-4 w-4 mr-2" />
+          Add Chat
+        </Button>
       </div>
+
+      <ConnectChatDialog open={addChatOpen} onOpenChange={setAddChatOpen} />
+
+      {/* Empty state for users with no chats yet */}
+      {!loading && totalChats === 0 && (
+        <Card className="p-8 text-center border-dashed">
+          <MessagesSquare className="h-12 w-12 mx-auto mb-3 text-muted-foreground opacity-60" />
+          <h3 className="font-semibold text-lg mb-1">No chats connected yet</h3>
+          <p className="text-muted-foreground text-sm mb-4">
+            Click <strong>Add Chat</strong> to get a one-time token and connect your first Telegram group.
+          </p>
+          <Button onClick={() => setAddChatOpen(true)} className="gradient-primary border-0">
+            <Plus className="h-4 w-4 mr-2" /> Add your first chat
+          </Button>
+        </Card>
+      )}
 
       {/* Stat cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4">

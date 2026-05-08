@@ -31,17 +31,24 @@ const Register = () => {
       if (!token) throw new Error("No auth token in response");
       setAuthToken(token);
 
-      // Accept the invite immediately so the user lands inside the workspace
-      // instead of being sent through onboarding.
+      // Accept the invite immediately so the user lands inside the workspace.
       if (inviteToken) {
         const acc = await apiFetch(`/api/invites/accept/${encodeURIComponent(inviteToken)}`, { method: "POST" });
         if (acc.ok) {
           navigate("/app");
           return;
         }
-        // Fall through to onboarding if the invite couldn't be applied.
       }
-      navigate("/onboarding");
+
+      // Auto-create a default workspace so the user can go straight to the
+      // dashboard. They'll connect a Telegram chat from there using the "Add
+      // Chat" flow rather than being forced through a multi-step onboarding.
+      await apiFetch("/api/workspaces", {
+        method: "POST",
+        body: JSON.stringify({ name: `${name || email}'s workspace` }),
+      }).catch(() => {});
+
+      navigate("/app");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Registration failed");
     } finally {
