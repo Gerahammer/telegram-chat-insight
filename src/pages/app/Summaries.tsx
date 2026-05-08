@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { SentimentBadge, TimeAgo } from "@/components/Badges";
 import { Sparkles, ArrowRight, Inbox, Calendar } from "lucide-react";
 import { apiFetch } from "@/lib/api";
+import { ChatPhoto } from "@/components/ChatPhoto";
 
 interface ApiChat {
   id: string;
@@ -73,17 +74,7 @@ const Summaries = () => {
                 <Card key={c.id} className="p-6 hover:shadow-md transition">
                   <div className="flex items-start justify-between gap-3 mb-3">
                     <div className="flex items-center gap-3">
-                      {c.photoUrl ? (
-                        <img
-                          src={`${import.meta.env.VITE_API_URL || "https://replyradar-backend-gqsm6.ondigitalocean.app"}/api/proxy/image?url=${encodeURIComponent(c.photoUrl)}`}
-                          alt={c.title}
-                          className="h-9 w-9 rounded-lg object-cover shrink-0"
-                        />
-                      ) : (
-                        <div className="h-9 w-9 rounded-lg gradient-primary flex items-center justify-center shrink-0">
-                          <Sparkles className="h-4 w-4 text-primary-foreground" />
-                        </div>
-                      )}
+                      <ChatPhoto photoUrl={c.photoUrl} title={c.title} size="md" />
                       <div>
                         <div className="font-semibold">{c.title}</div>
                         {c.todaySummary?.generatedAt && (
@@ -123,17 +114,7 @@ const Summaries = () => {
                   <Link key={c.id} to={`/app/chats/${c.id}`}>
                     <Card className="p-4 hover:border-primary/40 transition flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        {c.photoUrl ? (
-                          <img
-                            src={`${import.meta.env.VITE_API_URL || "https://replyradar-backend-gqsm6.ondigitalocean.app"}/api/proxy/image?url=${encodeURIComponent(c.photoUrl)}`}
-                            alt={c.title}
-                            className="h-8 w-8 rounded-lg object-cover"
-                          />
-                        ) : (
-                          <div className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center">
-                            <Sparkles className="h-4 w-4 text-muted-foreground" />
-                          </div>
-                        )}
+                        <ChatPhoto photoUrl={c.photoUrl} title={c.title} size="sm" />
                         <span className="font-medium text-sm">{c.title}</span>
                       </div>
                       <Badge variant="outline" className="text-xs text-muted-foreground">No summary yet</Badge>

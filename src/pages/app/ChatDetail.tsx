@@ -1358,7 +1358,7 @@ const ChatDetail = () => {
                           const txt = m.text ?? "";
                           if (txt.startsWith("[Voice]")) {
                             const summary = txt.replace("[Voice]", "").trim();
-                            const PROXY_BASE = (import.meta.env.VITE_API_URL || "https://replyradar-backend-gqsm6.ondigitalocean.app");
+                            const PROXY_BASE = (import.meta.env.VITE_API_URL ?? "").replace(/\/$/, "");
                             const audioFileId = (m as any).audioFileId;
                             const audioUrl = (m as any).audioUrl;
                             const proxyAudio = audioFileId

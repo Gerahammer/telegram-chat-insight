@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Hash } from "lucide-react";
 
-const API_BASE = import.meta.env.VITE_API_URL || "https://replyradar-backend-gqsm6.ondigitalocean.app";
+// `??` (not `||`) so an explicit empty string (same-origin / single ingress) is kept
+const API_BASE = (import.meta.env.VITE_API_URL ?? "").replace(/\/$/, "");
 const LEGACY_PROXY = API_BASE + "/api/proxy/image";
 
 interface ChatPhotoProps {
