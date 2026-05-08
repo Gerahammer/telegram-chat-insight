@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from "react-router-dom";
-import { LayoutDashboard, MessagesSquare, ListTodo, MoonStar, FileText, Settings, CreditCard, Search, GitCommit, CalendarDays } from "lucide-react";
+import { LayoutDashboard, MessagesSquare, ListTodo, MoonStar, FileText, Settings, Search, GitCommit, CalendarDays } from "lucide-react";
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent,
   SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem,
@@ -11,7 +11,6 @@ import { useWorkspaceStats } from "@/lib/workspace-stats";
 
 const bottomItems = [
   { title: "Settings", url: "/app/settings", icon: Settings },
-  { title: "Billing",  url: "/app/billing",  icon: CreditCard },
 ];
 
 export function AppSidebar() {
