@@ -1,6 +1,8 @@
 // Centralized API configuration.
 // All API calls in the app should go through this base URL.
-export const API_BASE_URL = "https://replyradar-backend-gqsm6.ondigitalocean.app";
+// Empty string = use relative paths (same origin as the page) — works when
+// frontend & backend are served behind a single ingress.
+export const API_BASE_URL = (import.meta.env.VITE_API_URL ?? "").replace(/\/$/, "");
 
 const TOKEN_STORAGE_KEY = "jwtToken";
 
